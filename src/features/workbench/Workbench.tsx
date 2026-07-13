@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   Group as PanelGroup,
   Panel,
@@ -11,6 +12,8 @@ import {
   GraduationCap,
   History,
   Layers,
+  LogIn,
+  LogOut,
   Play,
   Plus,
   Save,
@@ -18,6 +21,7 @@ import {
   Sun,
   Moon,
   Upload,
+  User as UserIcon,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,6 +35,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EngineProvider, useEngine } from "@/lib/db/engine-provider";
 import { MonacoSqlEditor } from "@/features/sql-editor/MonacoSqlEditor";
 import { ResultsGrid } from "@/features/database/ResultsGrid";
@@ -44,6 +49,8 @@ import {
 } from "@/features/workbench/workbench-storage";
 import type { EngineId, QueryResult } from "@/types/workbench";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useAuth, signOut } from "@/hooks/use-auth";
+
 
 type SidebarSection = "database" | "history" | "snippets" | "learn";
 
@@ -333,8 +340,74 @@ function TopBar({
         <Button size="sm" onClick={onOpenTutor}>
           <Sparkles className="mr-1 h-3.5 w-3.5" /> AI Tutor
         </Button>
+        <div className="mx-1 h-4 w-px bg-border" />
+        <UserMenu />
       </div>
     </header>
+  );
+}
+
+function UserMenu() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />;
+  }
+
+  if (!user) {
+    return (
+      <Button size="sm" variant="outline" className="h-8" asChild>
+        <Link to="/auth">
+          <LogIn className="mr-1 h-3.5 w-3.5" />
+          Sign in
+        </Link>
+      </Button>
+    );
+  }
+
+  const initials = (user.user_metadata?.full_name || user.email || "?")
+    .split(/\s+/)
+    .map((s: string) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-muted"
+          aria-label="Account menu"
+        >
+          <Avatar className="h-7 w-7">
+            {user.user_metadata?.avatar_url && (
+              <AvatarImage src={user.user_metadata.avatar_url} alt="" />
+            )}
+            <AvatarFallback className="bg-primary/10 text-[11px] font-medium text-primary">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="flex flex-col">
+          <span className="text-xs font-medium">
+            {user.user_metadata?.full_name || "Signed in"}
+          </span>
+          <span className="text-[11px] font-normal text-muted-foreground">{user.email}</span>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={async () => {
+            await signOut();
+            toast.success("Signed out");
+          }}
+        >
+          <LogOut className="mr-2 h-3.5 w-3.5" />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
