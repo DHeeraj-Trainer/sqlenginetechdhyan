@@ -1,5 +1,10 @@
 // @lovable.dev/vite-tanstack-config already includes core plugins.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const emptyShim = path.resolve(__dirname, "src/lib/empty-shim.ts");
 
 export default defineConfig({
   tanstackStart: {
@@ -8,11 +13,12 @@ export default defineConfig({
   vite: {
     resolve: {
       alias: [
-        // alasql references optional React Native / Node build deps we never use.
-        { find: /^react-native$/, replacement: "/dev-server/src/legacy/empty-shim.js" },
-        { find: /^react-native-fs$/, replacement: "/dev-server/src/legacy/empty-shim.js" },
-        { find: /^react-native-fetch-blob$/, replacement: "/dev-server/src/legacy/empty-shim.js" },
+        // alasql references optional React Native / Node build deps we never use in the browser.
+        { find: /^react-native$/, replacement: emptyShim },
+        { find: /^react-native-fs$/, replacement: emptyShim },
+        { find: /^react-native-fetch-blob$/, replacement: emptyShim },
       ],
     },
   },
 });
+
