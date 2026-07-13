@@ -53,6 +53,7 @@
     "@tanstack/react-start": "1.168.26",
     "@tanstack/react-virtual": "^3.14.6",
     "@tanstack/router-plugin": "1.168.19",
+    "@tanstack/start-server-core": "1.168.4",
     "ai": "^7.0.22",
     "alasql": "^4.17.3",
     "class-variance-authority": "^0.7.1",
