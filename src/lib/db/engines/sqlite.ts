@@ -32,7 +32,8 @@ export class SqliteEngine implements SqlEngine {
       const trimmed = statement.trim();
       if (!trimmed) continue;
       const start = performance.now();
-      const isSelect = /^\s*(select|with|pragma|explain)\b/i.test(trimmed);
+      const stripped = trimmed.replace(/^(?:\s*(?:--[^\n]*|\/\*[\s\S]*?\*\/))+/g, "").trimStart();
+      const isSelect = /^(select|with|pragma|explain|values)\b/i.test(stripped);
       if (isSelect) {
         const res = db.exec(trimmed);
         const durationMs = performance.now() - start;
