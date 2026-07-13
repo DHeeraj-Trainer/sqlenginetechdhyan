@@ -289,74 +289,94 @@ function WorkbenchInner() {
           )}
 
           <Panel minSize={30}>
-            <PanelGroup orientation="vertical">
-              <Panel defaultSize={55} minSize={20}>
-                <section
-                  role="region"
-                  aria-label="SQL editor"
-                  className="flex h-full flex-col"
-                  ref={editorRef}
+            <div className="flex h-full flex-col">
+              <div className="flex h-8 shrink-0 items-center justify-end gap-2 border-b bg-muted/30 px-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setEditorHidden((v) => !v)}
+                  className="rounded px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  aria-pressed={editorHidden}
+                  title={editorHidden ? "Show SQL editor" : "Hide SQL editor"}
                 >
-                  <EditorTabs
-                    tabs={tabs}
-                    activeId={activeTab?.id ?? ""}
-                    onSelect={setActiveId}
-                    onClose={closeTab}
-                    onNew={() => openNewTab()}
-                  />
-                  <EditorToolbar
-                    onRun={runActive}
-                    onFormat={formatActive}
-                    onSave={() => {
-                      if (!activeTab) return;
-                      saveSnippet({ name: activeTab.name, sql: activeTab.content, engine: engineId });
-                      toast.success("Snippet saved");
-                    }}
-                    engineStatus={status}
-                  />
-                  <div className="min-h-0 flex-1">
-                    {activeTab && (
-                      <MonacoSqlEditor
-                        theme={theme}
-                        value={activeTab.content}
-                        onChange={(v) => updateContent(activeTab.id, v)}
-                        onRun={runActive}
+                  {editorHidden ? "Show editor" : "Hide editor"}
+                </button>
+              </div>
+              <div className="min-h-0 flex-1">
+                <PanelGroup orientation="vertical">
+                  {!editorHidden && (
+                    <>
+                      <Panel defaultSize={55} minSize={20}>
+                        <section
+                          role="region"
+                          aria-label="SQL editor"
+                          className="flex h-full flex-col"
+                          ref={editorRef}
+                        >
+                          <EditorTabs
+                            tabs={tabs}
+                            activeId={activeTab?.id ?? ""}
+                            onSelect={setActiveId}
+                            onClose={closeTab}
+                            onNew={() => openNewTab()}
+                          />
+                          <EditorToolbar
+                            onRun={runActive}
+                            onFormat={formatActive}
+                            onSave={() => {
+                              if (!activeTab) return;
+                              saveSnippet({ name: activeTab.name, sql: activeTab.content, engine: engineId });
+                              toast.success("Snippet saved");
+                            }}
+                            engineStatus={status}
+                          />
+                          <div className="min-h-0 flex-1">
+                            {activeTab && (
+                              <MonacoSqlEditor
+                                theme={theme}
+                                value={activeTab.content}
+                                onChange={(v) => updateContent(activeTab.id, v)}
+                                onRun={runActive}
+                              />
+                            )}
+                          </div>
+                        </section>
+                      </Panel>
+                      <PanelResizeHandle
+                        className="h-1.5 bg-border/60 outline-none transition-colors hover:bg-primary/50 focus-visible:bg-primary"
+                        aria-label="Resize results"
                       />
-                    )}
-                  </div>
-                </section>
-              </Panel>
-              <PanelResizeHandle
-                className="h-1.5 bg-border/60 outline-none transition-colors hover:bg-primary/50 focus-visible:bg-primary"
-                aria-label="Resize results"
-              />
-              <Panel defaultSize={45} minSize={15}>
-                <section role="region" aria-label="Query results" className="flex h-full flex-col">
-                  <ResultsHeader
-                    results={results}
-                    activeIdx={activeResultIdx}
-                    onSelect={setActiveResultIdx}
-                    error={runError}
-                    engineError={status === "error" ? error : null}
-                  />
-                  <div className="min-h-0 flex-1">
-                    {runError ? (
-                      <ErrorPanel
-                        message={runError}
-                        onAskTutor={() => setTutorOpen(true)}
+                    </>
+                  )}
+                  <Panel defaultSize={editorHidden ? 100 : 45} minSize={15}>
+                    <section role="region" aria-label="Query results" className="flex h-full flex-col">
+                      <ResultsHeader
+                        results={results}
+                        activeIdx={activeResultIdx}
+                        onSelect={setActiveResultIdx}
+                        error={runError}
+                        engineError={status === "error" ? error : null}
                       />
-                    ) : activeResult ? (
-                      <ResultsGrid result={activeResult} />
-                    ) : (
-                      <EmptyResults status={status} engineError={error} />
-                    )}
-                  </div>
-                </section>
-              </Panel>
-            </PanelGroup>
+                      <div className="min-h-0 flex-1">
+                        {runError ? (
+                          <ErrorPanel
+                            message={runError}
+                            onAskTutor={() => setTutorOpen(true)}
+                          />
+                        ) : activeResult ? (
+                          <ResultsGrid result={activeResult} />
+                        ) : (
+                          <EmptyResults status={status} engineError={error} />
+                        )}
+                      </div>
+                    </section>
+                  </Panel>
+                </PanelGroup>
+              </div>
+            </div>
           </Panel>
         </PanelGroup>
       </div>
+
 
       {/* Mobile drawer sidebar */}
       <Sheet open={isMobile && mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
