@@ -332,6 +332,7 @@ function TopBar({
   onImport,
   onExport,
   onFormat,
+  onShare,
 }: {
   engineId: EngineId;
   onSwitchEngine: (id: EngineId) => Promise<void>;
@@ -341,12 +342,13 @@ function TopBar({
   onImport: () => void;
   onExport: () => void;
   onFormat: () => void;
+  onShare: () => void | Promise<void>;
 }) {
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b bg-muted/30 px-3">
       <div className="flex items-center gap-2 font-semibold">
         <Database className="h-4 w-4 text-primary" />
-        SQL Workbench
+        <span className="hidden sm:inline">SQL Workbench</span>
       </div>
       <div className="mx-2 h-4 w-px bg-border" />
       <EngineSwitcher engineId={engineId} onSwitch={onSwitchEngine} />
@@ -359,6 +361,9 @@ function TopBar({
         </Button>
         <Button size="sm" variant="ghost" className="h-8" onClick={onExport}>
           Export
+        </Button>
+        <Button size="sm" variant="ghost" className="h-8" onClick={() => void onShare()} aria-label="Share query">
+          Share
         </Button>
         <Button size="sm" variant="ghost" className="h-8" onClick={onToggleTheme} aria-label="Toggle theme">
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
