@@ -18,8 +18,27 @@ const sharedQueryOptions = (slug: string) =>
   });
 
 export const Route = createFileRoute("/s/$slug")({
-  loader: ({ params, context }) =>
-    context.queryClient.ensureQueryData(sharedQueryOptions(params.slug)),
+  loader: async ({ params, context }) => {
+    // SSR caching: shared queries are effectively immutable content. Emit
+    // CDN-friendly Cache-Control so bursts of concurrent viewers hit the
+    // edge cache instead of hammering Supabase.
+    //   - s-maxage: 5 min at the CDN
+    //   - stale-while-revalidate: 1 hour serve-stale while refreshing
+    // Cache-invalidation happens naturally on update: the query row's slug
+    // is stable but its `updated_at` bumps, and this handler simply refetches
+    // once stale. For an explicit purge, delete the share (admin panel).
+    try {
+      const { setResponseHeader } = await import("@tanstack/react-start/server");
+      setResponseHeader(
+        "cache-control",
+        "public, s-maxage=300, stale-while-revalidate=3600",
+      );
+      setResponseHeader("vary", "accept-encoding");
+    } catch {
+      /* not in a server request context (client nav) */
+    }
+    return context.queryClient.ensureQueryData(sharedQueryOptions(params.slug));
+  },
   head: ({ loaderData }) => {
     const title = loaderData?.title ?? "Shared query";
     const desc =
