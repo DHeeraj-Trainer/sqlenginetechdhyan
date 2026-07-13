@@ -29,7 +29,58 @@ export const Route = createFileRoute("/")({
   }),
   ssr: false,
   component: Index,
+  errorComponent: IndexError,
+  notFoundComponent: IndexNotFound,
 });
+
+function IndexError({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  useEffect(() => {
+    console.error("[route:/] error", error);
+    reportLovableError(error, { boundary: "route_index", route: "/" });
+  }, [error]);
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-xl font-semibold text-foreground">The workbench didn't load</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Something went wrong while loading the SQL Workbench. Try again, or head home.
+        </p>
+        <pre className="mt-3 max-h-32 overflow-auto rounded bg-muted p-2 text-left text-xs text-muted-foreground">
+          {error?.message ?? "Unknown error"}
+        </pre>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Try again
+          </button>
+          <a
+            href="/"
+            className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          >
+            Reload
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IndexNotFound() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-2xl font-semibold text-foreground">Nothing here</h1>
+        <p className="mt-2 text-sm text-muted-foreground">This workbench view isn't available.</p>
+      </div>
+    </div>
+  );
+}
 
 function Index() {
   const [mounted, setMounted] = useState(false);
