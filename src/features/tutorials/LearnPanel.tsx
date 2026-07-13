@@ -133,71 +133,142 @@ function DomainDetail({
   onOpenInEditor: (sql: string, filename?: string) => void;
 }) {
   const { engine, refreshTables } = useEngine();
+  const [loading, setLoading] = useState(false);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+
   const loadDomain = async () => {
-    if (!engine) return;
-    await engine.reset();
-    const script = domain.tables.map((t) => `${t.createScript}\n${t.insertScript}`).join("\n");
-    await engine.loadScript(script);
-    await refreshTables();
-    toast.success(`Loaded ${domain.name} into ${engine.label}`);
+    if (!engine || loading) return false;
+    setLoading(true);
+    try {
+      await engine.reset();
+      const script = domain.tables
+        .map((t) => `${t.createScript}\n${t.insertScript}`)
+        .join("\n");
+      await engine.loadScript(script);
+      await refreshTables();
+      setLoadedId(domain.id);
+      toast.success(`Loaded ${domain.name} into ${engine.label}`);
+      return true;
+    } catch (err) {
+      toast.error("Failed to load domain", { description: (err as Error).message });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startChallenge = async (q: (typeof domain.questions)[number]) => {
+    if (loadedId !== domain.id) {
+      const ok = await loadDomain();
+      if (!ok) return;
+    }
+    const scaffold =
+      `-- Challenge ${q.id} · ${q.category} · ${q.difficulty}\n` +
+      `-- ${q.text}\n` +
+      `--\n` +
+      `-- Tables available: ${domain.tables.map((t) => t.name).join(", ")}\n` +
+      `-- Write your SQL below and press Run.\n\n`;
+    onOpenInEditor(scaffold, `${q.id}.sql`);
+    toast.info(`Challenge ${q.id} opened — write your solution`);
   };
 
   return (
     <div className="space-y-4">
-      <header>
-        <h2 className="text-xl font-bold">{domain.name}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{domain.businessScenario}</p>
-      </header>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={loadDomain}>
-          Load into engine
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-bold sm:text-xl">{domain.name}</h2>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+            {domain.businessScenario}
+          </p>
+        </div>
+        <Button size="sm" onClick={loadDomain} disabled={loading} className="shrink-0">
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+          <span className="ml-1">
+            {loadedId === domain.id ? "Reload" : "Load"} into engine
+          </span>
         </Button>
-      </div>
+      </header>
+
       <section>
-        <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Real-world use</h3>
-        <p className="text-sm">{domain.realWorldUse}</p>
+        <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Real-world use
+        </h3>
+        <p className="text-xs sm:text-sm">{domain.realWorldUse}</p>
       </section>
+
       <section>
-        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Tables ({domain.tables.length})
         </h3>
-        <ul className="grid gap-2 md:grid-cols-2">
+        <ul className="grid gap-2 sm:grid-cols-2">
           {domain.tables.map((t) => (
-            <li key={t.name} className="rounded border p-3 text-xs">
-              <div className="mb-1 font-mono text-sm font-semibold">{t.name}</div>
-              <div className="text-muted-foreground">{t.description}</div>
-              <div className="mt-2 text-[11px]">{t.columns.length} columns</div>
-            </li>
-          ))}
-        </ul>
-      </section>
-      <section>
-        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Challenges ({domain.questions.length})
-        </h3>
-        <ul className="space-y-2">
-          {domain.questions.slice(0, 12).map((q) => (
-            <li key={q.id} className="rounded border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-xs font-semibold">
-                    {q.id} · {q.category} · {q.difficulty}
-                  </div>
-                  <p className="mt-1 text-sm">{q.text}</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onOpenInEditor(`-- ${q.text}\n${q.expectedQuery}\n`, `${q.id}.sql`)}
-                >
-                  Open in editor
-                </Button>
+            <li key={t.name} className="min-w-0 rounded border p-2 text-xs">
+              <div className="truncate font-mono text-sm font-semibold">{t.name}</div>
+              <div className="line-clamp-2 text-muted-foreground">{t.description}</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">
+                {t.columns.length} columns
               </div>
             </li>
           ))}
         </ul>
       </section>
+
+      <section>
+        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Challenges ({domain.questions.length}) — solve without peeking
+        </h3>
+        <ul className="space-y-2">
+          {domain.questions.map((q) => (
+            <ChallengeCard
+              key={q.id}
+              q={q}
+              onStart={() => startChallenge(q)}
+            />
+          ))}
+        </ul>
+      </section>
     </div>
+  );
+}
+
+function ChallengeCard({
+  q,
+  onStart,
+}: {
+  q: { id: string; text: string; category: string; difficulty: string; expectedQuery: string };
+  onStart: () => void;
+}) {
+  const [showSolution, setShowSolution] = useState(false);
+  return (
+    <li className="rounded border p-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {q.id} · {q.category} · {q.difficulty}
+          </div>
+          <p className="mt-1 break-words text-sm">{q.text}</p>
+        </div>
+        <Button size="sm" onClick={onStart} className="shrink-0">
+          Attempt
+        </Button>
+      </div>
+      <div className="mt-2 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setShowSolution((v) => !v)}
+          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+          aria-expanded={showSolution}
+        >
+          {showSolution ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+          {showSolution ? "Hide reference solution" : "Reveal reference solution"}
+        </button>
+      </div>
+      {showSolution && (
+        <pre className="mt-2 overflow-x-auto rounded bg-slate-950 p-2 text-[11px] leading-relaxed text-slate-100">
+          <code>{q.expectedQuery}</code>
+        </pre>
+      )}
+    </li>
   );
 }
 
