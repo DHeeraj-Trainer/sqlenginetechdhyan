@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import App from "@/legacy/App";
+import { lazy, Suspense, useEffect, useState } from "react";
+
+// Load the legacy Google-AI-Studio app on the client only. It uses
+// localStorage at initialization and alasql (browser-only build), so
+// SSR would crash or pull optional native deps.
+const App = lazy(() => import("@/legacy/App"));
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -21,19 +25,23 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  ssr: false,
   component: Index,
 });
 
 function Index() {
-  // App uses localStorage in a useState initializer, so render client-only.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">
-        Loading SQL Portal…
-      </div>
-    );
-  }
-  return <App />;
+
+  const fallback = (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">
+      Loading SQL Portal…
+    </div>
+  );
+  if (!mounted) return fallback;
+  return (
+    <Suspense fallback={fallback}>
+      <App />
+    </Suspense>
+  );
 }

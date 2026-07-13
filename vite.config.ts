@@ -8,8 +8,7 @@ export default defineConfig({
   vite: {
     resolve: {
       alias: [
-        // Force alasql's browser build; the default entry pulls Node/RN-only deps.
-        { find: /^alasql$/, replacement: "alasql/dist/alasql.min.js" },
+        // alasql references optional React Native / Node build deps we never use.
         { find: /^react-native$/, replacement: "/dev-server/src/legacy/empty-shim.js" },
         { find: /^react-native-fs$/, replacement: "/dev-server/src/legacy/empty-shim.js" },
         { find: /^react-native-fetch-blob$/, replacement: "/dev-server/src/legacy/empty-shim.js" },
