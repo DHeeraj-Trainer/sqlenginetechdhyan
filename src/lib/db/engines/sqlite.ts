@@ -128,20 +128,34 @@ export class SqliteEngine implements SqlEngine {
 }
 
 function splitStatements(sql: string): string[] {
-  // Simple splitter respecting single quotes and line comments.
   const out: string[] = [];
   let cur = "";
   let inSingle = false;
+  let inDouble = false;
   for (let i = 0; i < sql.length; i++) {
     const ch = sql[i];
-    if (ch === "'" && sql[i - 1] !== "\\") inSingle = !inSingle;
-    if (ch === "-" && sql[i + 1] === "-" && !inSingle) {
-      while (i < sql.length && sql[i] !== "\n") {
-        cur += sql[i++];
+    const next = sql[i + 1];
+    // Preserve line comments so isSelect detection has newlines available.
+    if (!inSingle && !inDouble && ch === "-" && next === "-") {
+      while (i < sql.length && sql[i] !== "\n") cur += sql[i++];
+      if (i < sql.length) cur += sql[i]; // keep the newline
+      continue;
+    }
+    // Block comments — preserve.
+    if (!inSingle && !inDouble && ch === "/" && next === "*") {
+      cur += ch;
+      i++;
+      while (i < sql.length && !(sql[i] === "*" && sql[i + 1] === "/")) cur += sql[i++];
+      if (i < sql.length) {
+        cur += sql[i]; // *
+        cur += sql[i + 1]; // /
+        i++;
       }
       continue;
     }
-    if (ch === ";" && !inSingle) {
+    if (ch === "'" && !inDouble) inSingle = !inSingle;
+    else if (ch === '"' && !inSingle) inDouble = !inDouble;
+    if (ch === ";" && !inSingle && !inDouble) {
       out.push(cur);
       cur = "";
       continue;
