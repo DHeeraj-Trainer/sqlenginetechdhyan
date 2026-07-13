@@ -113,11 +113,23 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        {/* Early inline style so the Lovable badge never flashes before styles.css loads. */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `#lovable-badge,#lovable-badge *,[id^="lovable-badge"],[id^="lovable-badge"] *,[class*="lovable-badge"],[data-lovable-badge],a[href*="lovable.dev"][target="_blank"]{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;width:0!important;height:0!important;}`,
+          }}
+        />
         <HeadContent />
       </head>
       <body>
         {children}
         <Scripts />
+        {/* Continuously strip the Lovable badge if it is injected after hydration. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){function strip(){document.querySelectorAll('#lovable-badge,[id^="lovable-badge"],[class*="lovable-badge"],[data-lovable-badge],a[href*="lovable.dev"][target="_blank"]').forEach(function(el){el.remove();});}if(typeof window!=="undefined"){strip();try{new MutationObserver(strip).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}}})();`,
+          }}
+        />
       </body>
     </html>
   );
