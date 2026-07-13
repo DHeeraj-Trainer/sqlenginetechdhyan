@@ -185,6 +185,32 @@ function WorkbenchInner() {
         onImport={handleImport}
         onExport={handleExport}
         onFormat={formatActive}
+        onShare={async () => {
+          if (!activeTab?.content.trim()) {
+            toast.error("Nothing to share — tab is empty.");
+            return;
+          }
+          try {
+            const { useShareQuery } = await import("@/features/workbench/workbench-storage");
+            void useShareQuery; // hook can't be called imperatively; use fetch path
+            const { createShare } = await import("@/lib/workbench.functions");
+            const res = await createShare({
+              data: {
+                title: activeTab.name || "Shared query",
+                sql: activeTab.content,
+                engine: engineId,
+                visibility: "public" as const,
+              },
+            });
+            const url = `${window.location.origin}/s/${res.slug}`;
+            await navigator.clipboard.writeText(url);
+            toast.success("Share link copied to clipboard", { description: url });
+          } catch (err) {
+            toast.error("Could not create share link", {
+              description: (err as Error).message,
+            });
+          }
+        }}
       />
 
       <div className="flex flex-1 overflow-hidden">
