@@ -50,9 +50,19 @@ import {
 import type { EngineId, QueryResult } from "@/types/workbench";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAuth, signOut } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 
 type SidebarSection = "database" | "history" | "snippets" | "learn";
+
+const SIDEBAR_LABEL: Record<SidebarSection, string> = {
+  database: "Database explorer",
+  history: "Query history",
+  snippets: "Saved snippets",
+  learn: "Learn",
+};
 
 export function Workbench() {
   return (
