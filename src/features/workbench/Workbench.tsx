@@ -244,11 +244,9 @@ function WorkbenchInner() {
           {!isMobile && sidebarOpen && (
             <>
               <Panel
-
-
-                defaultSize={26}
-                minSize={20}
-                maxSize={48}
+                defaultSize="280px"
+                minSize="240px"
+                maxSize="480px"
                 collapsible
               >
                 <aside
