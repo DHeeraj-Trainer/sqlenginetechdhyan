@@ -21,21 +21,17 @@ export const Route = createFileRoute("/s/$slug")({
   loader: async ({ params, context }) => {
     // SSR caching: shared queries are effectively immutable content. Emit
     // CDN-friendly Cache-Control so bursts of concurrent viewers hit the
-    // edge cache instead of hammering Supabase.
+    // edge cache instead of hammering the database.
     //   - s-maxage: 5 min at the CDN
     //   - stale-while-revalidate: 1 hour serve-stale while refreshing
-    // Cache-invalidation happens naturally on update: the query row's slug
-    // is stable but its `updated_at` bumps, and this handler simply refetches
-    // once stale. For an explicit purge, delete the share (admin panel).
+    // Cache-invalidation: admin actions that change a share (make_private,
+    // delete) bump the row, and the next miss refetches; for an explicit
+    // purge, delete the share from the admin panel.
     try {
-      const { setResponseHeader } = await import("@tanstack/react-start/server");
-      setResponseHeader(
-        "cache-control",
-        "public, s-maxage=300, stale-while-revalidate=3600",
-      );
-      setResponseHeader("vary", "accept-encoding");
+      const { setPublicCacheHeaders } = await import("@/lib/ssr-cache.server");
+      setPublicCacheHeaders();
     } catch {
-      /* not in a server request context (client nav) */
+      /* client-side navigation */
     }
     return context.queryClient.ensureQueryData(sharedQueryOptions(params.slug));
   },
