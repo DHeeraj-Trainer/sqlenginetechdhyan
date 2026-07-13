@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   Group as PanelGroup,
   Panel,
@@ -11,6 +12,8 @@ import {
   GraduationCap,
   History,
   Layers,
+  LogIn,
+  LogOut,
   Play,
   Plus,
   Save,
@@ -18,6 +21,7 @@ import {
   Sun,
   Moon,
   Upload,
+  User as UserIcon,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,6 +35,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EngineProvider, useEngine } from "@/lib/db/engine-provider";
 import { MonacoSqlEditor } from "@/features/sql-editor/MonacoSqlEditor";
 import { ResultsGrid } from "@/features/database/ResultsGrid";
@@ -44,6 +49,8 @@ import {
 } from "@/features/workbench/workbench-storage";
 import type { EngineId, QueryResult } from "@/types/workbench";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useAuth, signOut } from "@/hooks/use-auth";
+
 
 type SidebarSection = "database" | "history" | "snippets" | "learn";
 
