@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
+import { reportLovableError } from "@/lib/lovable-error-reporting";
 
 // Workbench uses Monaco + WASM engines; keep on client to avoid SSR of
 // browser-only libraries and to preserve fast first paint.
