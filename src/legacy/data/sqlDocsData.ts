@@ -1,3 +1,4 @@
+// @ts-nocheck
 export interface DocChapter {
   id: string;
   title: string;

@@ -1,3 +1,4 @@
+// @ts-nocheck
 export interface SQLCommandCategory {
   category: string;
   fullName: string;

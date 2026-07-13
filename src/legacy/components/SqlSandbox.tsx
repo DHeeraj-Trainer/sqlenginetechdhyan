@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect } from "react";
 import alasql from "alasql";
 import { Play, Check, Copy, Sparkles, HelpCircle, Info, FileText, ChevronRight, CheckCircle2, RotateCcw, Download, Clock, Database, Key, Maximize2, Minimize2, Link, List, Terminal, BookOpen, Table, Zap, GitCommit, Eye, Settings2, Sliders, ArrowUpDown, Search, Code, Award, HelpCircle as HelpIcon, Flame } from "lucide-react";

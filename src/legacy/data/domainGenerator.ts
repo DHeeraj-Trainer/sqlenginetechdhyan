@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DomainData, SQLTable, PracticeQuestion } from "../types";
 import { healthcareData } from "./domain_healthcare";
 

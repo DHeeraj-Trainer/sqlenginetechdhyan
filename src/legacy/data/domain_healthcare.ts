@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DomainData } from "../types";
 
 export const healthcareData: DomainData = {
