@@ -335,7 +335,6 @@ export function useSavedSnippets() {
 /* ------------------------------------------------------------------ */
 
 export function useShareQuery() {
-  const { createShare } = require("@/lib/workbench.functions") as typeof import("@/lib/workbench.functions");
   const shareFn = useServerFn(createShare);
   return useMutation({
     mutationFn: async (input: {
