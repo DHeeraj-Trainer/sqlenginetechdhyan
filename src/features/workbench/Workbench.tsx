@@ -556,7 +556,17 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
   );
 }
 
-function SidebarRail({ active, onSelect }: { active: SidebarSection; onSelect: (s: SidebarSection) => void }) {
+function SidebarRail({
+  active,
+  onSelect,
+  collapsed,
+  onToggleCollapse,
+}: {
+  active: SidebarSection;
+  onSelect: (s: SidebarSection) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
   const items: { id: SidebarSection; label: string; icon: React.ReactNode }[] = [
     { id: "database", label: "Database", icon: <Database className="h-4 w-4" /> },
     { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
@@ -564,22 +574,84 @@ function SidebarRail({ active, onSelect }: { active: SidebarSection; onSelect: (
     { id: "learn", label: "Learn", icon: <GraduationCap className="h-4 w-4" /> },
   ];
   return (
-    <nav className="flex w-12 flex-col items-center gap-1 border-r bg-muted/40 py-2">
-      {items.map((i) => (
-        <button
-          key={i.id}
-          onClick={() => onSelect(i.id)}
-          title={i.label}
-          className={`flex h-10 w-10 items-center justify-center rounded ${
-            active === i.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-          }`}
-          aria-label={i.label}
-          aria-current={active === i.id}
-        >
-          {i.icon}
-        </button>
-      ))}
+    <nav
+      aria-label="Workbench sections"
+      className="flex w-12 shrink-0 flex-col items-center gap-1 border-r bg-muted/40 py-2"
+    >
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        aria-label={collapsed ? "Open sidebar" : "Close sidebar"}
+        aria-expanded={!collapsed}
+        aria-controls={`sidebar-panel-${active}`}
+        className="mb-1 flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+      </button>
+      <div role="tablist" aria-orientation="vertical" className="flex flex-col gap-1">
+        {items.map((i) => {
+          const selected = active === i.id;
+          return (
+            <button
+              key={i.id}
+              role="tab"
+              type="button"
+              onClick={() => onSelect(i.id)}
+              title={i.label}
+              aria-selected={selected}
+              aria-controls={`sidebar-panel-${i.id}`}
+              tabIndex={selected ? 0 : -1}
+              className={`flex h-10 w-10 items-center justify-center rounded transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
+                selected
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {i.icon}
+              <span className="sr-only">{i.label}</span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
+  );
+}
+
+function SidebarBody({
+  section,
+  history,
+  snippets,
+  onInsert,
+  onLoadNewTab,
+  onClearHistory,
+  onDeleteSnippet,
+  onOpenLearn,
+}: {
+  section: SidebarSection;
+  history: ReturnType<typeof useQueryHistory>["history"];
+  snippets: ReturnType<typeof useSavedSnippets>["snippets"];
+  onInsert: (sql: string) => void;
+  onLoadNewTab: (sql: string) => void;
+  onClearHistory: () => void;
+  onDeleteSnippet: (id: string) => void;
+  onOpenLearn: (sql: string) => void;
+}) {
+  return (
+    <div
+      role="tabpanel"
+      id={`sidebar-panel-${section}`}
+      aria-label={SIDEBAR_LABEL[section]}
+      className="h-full"
+    >
+      {section === "database" && <DatabaseExplorer onInsertQuery={onInsert} />}
+      {section === "history" && (
+        <HistoryList history={history} onLoad={onLoadNewTab} onClear={onClearHistory} />
+      )}
+      {section === "snippets" && (
+        <SnippetsList snippets={snippets} onLoad={onLoadNewTab} onDelete={onDeleteSnippet} />
+      )}
+      {section === "learn" && <LearnPanel onOpenInEditor={(sql) => onOpenLearn(sql)} />}
+    </div>
   );
 }
 
