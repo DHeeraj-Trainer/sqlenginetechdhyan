@@ -244,8 +244,8 @@ function WorkbenchInner() {
           {!isMobile && sidebarOpen && (
             <>
               <Panel
-                id="wb-sidebar"
-                order={1}
+
+
                 defaultSize={26}
                 minSize={20}
                 maxSize={48}
@@ -289,7 +289,7 @@ function WorkbenchInner() {
             </>
           )}
 
-          <Panel id="wb-main" order={2} minSize={30}>
+          <Panel minSize={30}>
             <PanelGroup orientation="vertical">
               <Panel defaultSize={55} minSize={20}>
                 <section
