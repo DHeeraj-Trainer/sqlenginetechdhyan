@@ -10,12 +10,22 @@ import {
   aggregateFunctionsSyllabus,
 } from "@/legacy/data/syllabus";
 
+import { buildAdvancedChallenges } from "./advanced-challenges";
+
 export type LegacyDomain = ReturnType<typeof generateAllDomains>[number];
 export type LegacyChapter = (typeof sqlChapters)[number];
 
 let cache: LegacyDomain[] | null = null;
 export function getLegacyDomains(): LegacyDomain[] {
-  if (!cache) cache = generateAllDomains();
+  if (!cache) {
+    const domains = generateAllDomains();
+    // Attach an advanced track to every domain — tough challenges the student
+    // must solve in order, with in-app verification against the reference query.
+    for (const d of domains) {
+      (d as any).advancedQuestions = buildAdvancedChallenges(d);
+    }
+    cache = domains;
+  }
   return cache;
 }
 
