@@ -191,8 +191,6 @@ function WorkbenchInner() {
             return;
           }
           try {
-            const { useShareQuery } = await import("@/features/workbench/workbench-storage");
-            void useShareQuery; // hook can't be called imperatively; use fetch path
             const { createShare } = await import("@/lib/workbench.functions");
             const res = await createShare({
               data: {
