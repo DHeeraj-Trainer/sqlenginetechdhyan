@@ -18,11 +18,21 @@ body {
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
+/* Hide the Lovable badge widget on every page and dynamically loaded view.
+   Covers the container, all descendants, and any orphaned close buttons. */
 #lovable-badge,
-#lovable-badge * {
+#lovable-badge *,
+[id^="lovable-badge"],
+[id^="lovable-badge"] *,
+[class*="lovable-badge"],
+[data-lovable-badge],
+a[href*="lovable.dev"][target="_blank"] {
   display: none !important;
   visibility: hidden !important;
+  opacity: 0 !important;
   pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 
