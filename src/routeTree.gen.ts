@@ -10,53 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiTutorChatRouteImport } from './routes/api/tutor/chat'
-import { Route as ApiTutorAnalyzeRouteImport } from './routes/api/tutor/analyze'
+import { Route as ApiTutorChatStreamRouteImport } from './routes/api/tutor/chat-stream'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTutorChatRoute = ApiTutorChatRouteImport.update({
-  id: '/api/tutor/chat',
-  path: '/api/tutor/chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTutorAnalyzeRoute = ApiTutorAnalyzeRouteImport.update({
-  id: '/api/tutor/analyze',
-  path: '/api/tutor/analyze',
+const ApiTutorChatStreamRoute = ApiTutorChatStreamRouteImport.update({
+  id: '/api/tutor/chat-stream',
+  path: '/api/tutor/chat-stream',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/api/tutor/analyze': typeof ApiTutorAnalyzeRoute
-  '/api/tutor/chat': typeof ApiTutorChatRoute
+  '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/api/tutor/analyze': typeof ApiTutorAnalyzeRoute
-  '/api/tutor/chat': typeof ApiTutorChatRoute
+  '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/api/tutor/analyze': typeof ApiTutorAnalyzeRoute
-  '/api/tutor/chat': typeof ApiTutorChatRoute
+  '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/tutor/analyze' | '/api/tutor/chat'
+  fullPaths: '/' | '/api/tutor/chat-stream'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/tutor/analyze' | '/api/tutor/chat'
-  id: '__root__' | '/' | '/api/tutor/analyze' | '/api/tutor/chat'
+  to: '/' | '/api/tutor/chat-stream'
+  id: '__root__' | '/' | '/api/tutor/chat-stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ApiTutorAnalyzeRoute: typeof ApiTutorAnalyzeRoute
-  ApiTutorChatRoute: typeof ApiTutorChatRoute
+  ApiTutorChatStreamRoute: typeof ApiTutorChatStreamRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -68,18 +58,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/tutor/chat': {
-      id: '/api/tutor/chat'
-      path: '/api/tutor/chat'
-      fullPath: '/api/tutor/chat'
-      preLoaderRoute: typeof ApiTutorChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tutor/analyze': {
-      id: '/api/tutor/analyze'
-      path: '/api/tutor/analyze'
-      fullPath: '/api/tutor/analyze'
-      preLoaderRoute: typeof ApiTutorAnalyzeRouteImport
+    '/api/tutor/chat-stream': {
+      id: '/api/tutor/chat-stream'
+      path: '/api/tutor/chat-stream'
+      fullPath: '/api/tutor/chat-stream'
+      preLoaderRoute: typeof ApiTutorChatStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -87,19 +70,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ApiTutorAnalyzeRoute: ApiTutorAnalyzeRoute,
-  ApiTutorChatRoute: ApiTutorChatRoute,
+  ApiTutorChatStreamRoute: ApiTutorChatStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
