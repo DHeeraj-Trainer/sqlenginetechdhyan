@@ -18,8 +18,23 @@ const sharedQueryOptions = (slug: string) =>
   });
 
 export const Route = createFileRoute("/s/$slug")({
-  loader: ({ params, context }) =>
-    context.queryClient.ensureQueryData(sharedQueryOptions(params.slug)),
+  loader: async ({ params, context }) => {
+    // SSR caching: shared queries are effectively immutable content. Emit
+    // CDN-friendly Cache-Control so bursts of concurrent viewers hit the
+    // edge cache instead of hammering the database.
+    //   - s-maxage: 5 min at the CDN
+    //   - stale-while-revalidate: 1 hour serve-stale while refreshing
+    // Cache-invalidation: admin actions that change a share (make_private,
+    // delete) bump the row, and the next miss refetches; for an explicit
+    // purge, delete the share from the admin panel.
+    try {
+      const { setPublicCacheHeaders } = await import("@/lib/ssr-cache.server");
+      setPublicCacheHeaders();
+    } catch {
+      /* client-side navigation */
+    }
+    return context.queryClient.ensureQueryData(sharedQueryOptions(params.slug));
+  },
   head: ({ loaderData }) => {
     const title = loaderData?.title ?? "Shared query";
     const desc =
