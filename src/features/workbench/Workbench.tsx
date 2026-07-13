@@ -670,28 +670,38 @@ function EditorTabs({
 }) {
   return (
     <div className="flex items-center gap-0 border-b bg-muted/20 pr-2">
-      <ul className="flex overflow-x-auto">
-        {tabs.map((t) => (
-          <li key={t.id}>
+      <div role="tablist" aria-label="Query tabs" className="flex overflow-x-auto">
+        {tabs.map((t) => {
+          const selected = activeId === t.id;
+          return (
             <div
+              key={t.id}
               className={`group flex items-center gap-1 border-r px-3 py-1.5 text-xs ${
-                activeId === t.id ? "bg-background font-semibold" : "hover:bg-muted/40"
+                selected ? "bg-background font-semibold" : "hover:bg-muted/40"
               }`}
             >
-              <button onClick={() => onSelect(t.id)} className="whitespace-nowrap font-mono">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => onSelect(t.id)}
+                className="whitespace-nowrap font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 {t.name}
               </button>
               <button
+                type="button"
                 onClick={() => onClose(t.id)}
-                className="rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
+                className="rounded p-0.5 opacity-70 hover:bg-muted focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 sm:opacity-0"
                 aria-label={`Close ${t.name}`}
               >
                 <X className="h-3 w-3" />
               </button>
             </div>
-          </li>
-        ))}
-      </ul>
+          );
+        })}
+      </div>
       <button
         onClick={onNew}
         title="New query"
