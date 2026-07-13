@@ -227,7 +227,283 @@ function DomainDetail({
           ))}
         </ul>
       </section>
+
+      <AdvancedTrack domain={domain} loadedId={loadedId} ensureLoaded={loadDomain} />
     </div>
+  );
+}
+
+// ---------- Advanced (verified, sequential) ----------
+
+function AdvancedTrack({
+  domain,
+  loadedId,
+  ensureLoaded,
+}: {
+  domain: any;
+  loadedId: string | null;
+  ensureLoaded: () => Promise<boolean>;
+}) {
+  const advanced: any[] = domain.advancedQuestions ?? [];
+  const storageKey = `learn.adv.solved.${domain.id}`;
+  const [solved, setSolved] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      return new Set(JSON.parse(localStorage.getItem(storageKey) ?? "[]"));
+    } catch {
+      return new Set();
+    }
+  });
+
+  const markSolved = (id: string) => {
+    setSolved((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const reset = () => {
+    setSolved(new Set());
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  if (!advanced.length) return null;
+
+  // First unsolved index = the currently unlocked challenge. Everything after is locked.
+  const currentIdx = advanced.findIndex((q) => !solved.has(q.id));
+  const activeIdx = currentIdx === -1 ? advanced.length : currentIdx;
+  const pct = Math.round((solved.size / advanced.length) * 100);
+
+  return (
+    <section>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Advanced track ({advanced.length}) — verified & sequential
+        </h3>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span>
+            {solved.size} / {advanced.length} solved
+          </span>
+          <button
+            type="button"
+            onClick={reset}
+            className="rounded border px-1.5 py-0.5 hover:bg-muted"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+      <div className="mb-3 h-1.5 w-full overflow-hidden rounded bg-muted">
+        <div
+          className="h-full bg-emerald-500 transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <ul className="space-y-2">
+        {advanced.map((q, i) => (
+          <AdvancedCard
+            key={q.id}
+            q={q}
+            index={i}
+            state={
+              solved.has(q.id) ? "solved" : i === activeIdx ? "active" : "locked"
+            }
+            domainLoaded={loadedId === domain.id}
+            ensureLoaded={ensureLoaded}
+            onSolved={() => markSolved(q.id)}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function normalizeRows(rows: unknown[][]): string {
+  // Sort row-major so ORDER BY differences don't matter for verification.
+  // Each row is stringified via JSON to keep types stable across engines.
+  const asStrings = rows.map((r) => JSON.stringify(r.map((v) => (v == null ? null : String(v)))));
+  asStrings.sort();
+  return asStrings.join("|");
+}
+
+function AdvancedCard({
+  q,
+  index,
+  state,
+  domainLoaded,
+  ensureLoaded,
+  onSolved,
+}: {
+  q: any;
+  index: number;
+  state: "locked" | "active" | "solved";
+  domainLoaded: boolean;
+  ensureLoaded: () => Promise<boolean>;
+  onSolved: () => void;
+}) {
+  const { runQuery } = useEngine();
+  const [sql, setSql] = useState("");
+  const [showSolution, setShowSolution] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<
+    | { kind: "ok"; msg: string }
+    | { kind: "err"; msg: string; detail?: string }
+    | null
+  >(null);
+
+  const locked = state === "locked";
+  const solved = state === "solved";
+
+  const verify = async () => {
+    if (!sql.trim()) {
+      setFeedback({ kind: "err", msg: "Write some SQL first." });
+      return;
+    }
+    setBusy(true);
+    setFeedback(null);
+    try {
+      if (!domainLoaded) {
+        const ok = await ensureLoaded();
+        if (!ok) {
+          setFeedback({ kind: "err", msg: "Domain failed to load into the engine." });
+          return;
+        }
+      }
+      const [mine, ref] = await Promise.all([runQuery(sql), runQuery(q.expectedQuery)]);
+      if (mine.error) {
+        setFeedback({ kind: "err", msg: "Your SQL errored.", detail: mine.error });
+        return;
+      }
+      if (ref.error || !ref.results?.length) {
+        setFeedback({
+          kind: "err",
+          msg: "Reference query failed to run — please reload the domain.",
+          detail: ref.error ?? "",
+        });
+        return;
+      }
+      const mineLast = mine.results?.[mine.results.length - 1];
+      const refLast = ref.results[ref.results.length - 1];
+      if (!mineLast) {
+        setFeedback({ kind: "err", msg: "Your query returned no result set." });
+        return;
+      }
+      const okRows = normalizeRows(mineLast.rows) === normalizeRows(refLast.rows);
+      const okCols =
+        mineLast.columns.length === refLast.columns.length &&
+        mineLast.rows.length === refLast.rows.length;
+      if (okRows && okCols) {
+        setFeedback({
+          kind: "ok",
+          msg: `Correct! ${mineLast.rows.length} row(s), ${mine.durationMs.toFixed(0)}ms.`,
+        });
+        onSolved();
+        toast.success(`Challenge ${q.id} solved`);
+      } else {
+        setFeedback({
+          kind: "err",
+          msg: "Result doesn't match the reference.",
+          detail: `Expected ${refLast.rows.length} row(s) × ${refLast.columns.length} col(s); got ${mineLast.rows.length} × ${mineLast.columns.length}.`,
+        });
+      }
+    } catch (e) {
+      setFeedback({ kind: "err", msg: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li
+      className={`rounded border p-3 ${
+        solved ? "border-emerald-500/60 bg-emerald-500/5" : locked ? "opacity-60" : ""
+      }`}
+    >
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {solved ? (
+              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            ) : locked ? (
+              <Lock className="h-3 w-3" />
+            ) : (
+              <Play className="h-3 w-3 text-primary" />
+            )}
+            #{index + 1} · {q.category} · {q.difficulty}
+          </div>
+          <p className="mt-1 break-words text-sm">{q.text}</p>
+        </div>
+      </div>
+
+      {!locked && !solved && (
+        <>
+          <textarea
+            value={sql}
+            onChange={(e) => setSql(e.target.value)}
+            spellCheck={false}
+            placeholder="-- Write your SQL, then click Verify"
+            className="mt-2 h-24 w-full resize-y rounded border bg-background p-2 font-mono text-[12px]"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={verify} disabled={busy}>
+              {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+              Verify
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowSolution((v) => !v)}
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              {showSolution ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+              {showSolution ? "Hide reference" : "Reveal reference"}
+            </button>
+          </div>
+          {showSolution && (
+            <pre className="mt-2 overflow-x-auto rounded bg-slate-950 p-2 text-[11px] leading-relaxed text-slate-100">
+              <code>{q.expectedQuery}</code>
+            </pre>
+          )}
+          {feedback && (
+            <div
+              className={`mt-2 rounded border p-2 text-xs ${
+                feedback.kind === "ok"
+                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                  : "border-destructive/60 bg-destructive/10 text-destructive"
+              }`}
+            >
+              <div className="font-semibold">{feedback.msg}</div>
+              {"detail" in feedback && feedback.detail ? (
+                <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+                  {feedback.detail}
+                </pre>
+              ) : null}
+            </div>
+          )}
+        </>
+      )}
+
+      {solved && (
+        <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+          Solved. Next challenge unlocked.
+        </p>
+      )}
+      {locked && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Solve the previous challenge to unlock.
+        </p>
+      )}
+    </li>
   );
 }
 
