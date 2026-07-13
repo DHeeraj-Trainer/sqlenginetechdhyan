@@ -17,6 +17,7 @@ import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiTutorChatStreamRouteImport } from './routes/api/tutor/chat-stream'
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -57,6 +58,11 @@ const ApiTutorChatStreamRoute = ApiTutorChatStreamRouteImport.update({
   path: '/api/tutor/chat-stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/s/$slug': typeof SSlugRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -72,6 +79,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/s/$slug': typeof SSlugRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/s/$slug': typeof SSlugRoute
+  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -94,6 +103,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/admin'
     | '/s/$slug'
+    | '/admin/users'
     | '/api/tutor/chat-stream'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -102,6 +112,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/s/$slug'
+    | '/admin/users'
     | '/api/tutor/chat-stream'
     | '/admin'
   id:
@@ -112,6 +123,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/_authenticated/admin'
     | '/s/$slug'
+    | '/_authenticated/admin/users'
     | '/api/tutor/chat-stream'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
@@ -183,14 +195,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTutorChatStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/users': {
+      id: '/_authenticated/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
