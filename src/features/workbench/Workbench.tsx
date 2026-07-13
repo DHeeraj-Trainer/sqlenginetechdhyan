@@ -225,46 +225,79 @@ function WorkbenchInner() {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        <SidebarRail active={sidebar} onSelect={setSidebar} />
+        <SidebarRail
+          active={sidebar}
+          onSelect={(s) => {
+            setSidebar(s);
+            if (isMobile) setMobileSidebarOpen(true);
+            else if (!sidebarOpen) setSidebarOpen(true);
+          }}
+          collapsed={isMobile ? false : !sidebarOpen}
+          onToggleCollapse={
+            isMobile
+              ? () => setMobileSidebarOpen((v) => !v)
+              : () => setSidebarOpen((v) => !v)
+          }
+        />
 
         <PanelGroup orientation="horizontal" className="flex-1">
-          <Panel defaultSize={22} minSize={16} maxSize={40}>
-            <div className="h-full border-r">
-              {sidebar === "database" && (
-                <DatabaseExplorer onInsertQuery={(sql) => insertAtEditor(sql)} />
-              )}
-              {sidebar === "history" && (
-                <HistoryList
-                  history={history}
-                  onLoad={(sql) => insertAtEditor(sql, true)}
-                  onClear={clearHistory}
-                />
-              )}
-              {sidebar === "snippets" && (
-                <SnippetsList
-                  snippets={snippets}
-                  onLoad={(sql) => insertAtEditor(sql, true)}
-                  onDelete={removeSnippet}
-                />
-              )}
-              {sidebar === "learn" && (
-                <LearnPanel
-                  onOpenInEditor={(sql, filename) => {
-                    openNewTab(sql);
-                    if (filename && activeTab) {
-                      /* filename hint applied to newest tab in useEditorTabs */
-                    }
-                  }}
-                />
-              )}
-            </div>
-          </Panel>
-          <PanelResizeHandle className="w-1 bg-border/60 hover:bg-primary/40" />
+          {!isMobile && sidebarOpen && (
+            <>
+              <Panel
+                id="wb-sidebar"
+                order={1}
+                defaultSize={26}
+                minSize={20}
+                maxSize={48}
+                collapsible
+              >
+                <aside
+                  role="region"
+                  aria-label={SIDEBAR_LABEL[sidebar]}
+                  id={`sidebar-panel-${sidebar}`}
+                  className="flex h-full min-w-0 flex-col border-r bg-card"
+                >
+                  <div className="flex h-9 shrink-0 items-center justify-between border-b bg-muted/40 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <span className="truncate">{SIDEBAR_LABEL[sidebar]}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSidebarOpen(false)}
+                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      aria-label="Collapse sidebar"
+                    >
+                      <PanelLeftClose className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <SidebarBody
+                      section={sidebar}
+                      history={history}
+                      snippets={snippets}
+                      onInsert={(sql) => insertAtEditor(sql)}
+                      onLoadNewTab={(sql) => insertAtEditor(sql, true)}
+                      onClearHistory={clearHistory}
+                      onDeleteSnippet={removeSnippet}
+                      onOpenLearn={(sql) => openNewTab(sql)}
+                    />
+                  </div>
+                </aside>
+              </Panel>
+              <PanelResizeHandle
+                className="w-1.5 bg-border/60 outline-none transition-colors hover:bg-primary/50 focus-visible:bg-primary"
+                aria-label="Resize sidebar"
+              />
+            </>
+          )}
 
-          <Panel minSize={30}>
+          <Panel id="wb-main" order={2} minSize={30}>
             <PanelGroup orientation="vertical">
               <Panel defaultSize={55} minSize={20}>
-                <div className="flex h-full flex-col" ref={editorRef}>
+                <section
+                  role="region"
+                  aria-label="SQL editor"
+                  className="flex h-full flex-col"
+                  ref={editorRef}
+                >
                   <EditorTabs
                     tabs={tabs}
                     activeId={activeTab?.id ?? ""}
@@ -292,11 +325,14 @@ function WorkbenchInner() {
                       />
                     )}
                   </div>
-                </div>
+                </section>
               </Panel>
-              <PanelResizeHandle className="h-1 bg-border/60 hover:bg-primary/40" />
+              <PanelResizeHandle
+                className="h-1.5 bg-border/60 outline-none transition-colors hover:bg-primary/50 focus-visible:bg-primary"
+                aria-label="Resize results"
+              />
               <Panel defaultSize={45} minSize={15}>
-                <div className="flex h-full flex-col">
+                <section role="region" aria-label="Query results" className="flex h-full flex-col">
                   <ResultsHeader
                     results={results}
                     activeIdx={activeResultIdx}
@@ -316,12 +352,42 @@ function WorkbenchInner() {
                       <EmptyResults status={status} engineError={error} />
                     )}
                   </div>
-                </div>
+                </section>
               </Panel>
             </PanelGroup>
           </Panel>
         </PanelGroup>
       </div>
+
+      {/* Mobile drawer sidebar */}
+      <Sheet open={isMobile && mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+        <SheetContent side="left" className="w-[min(88vw,340px)] p-0">
+          <SheetHeader className="border-b px-4 py-3">
+            <SheetTitle className="text-sm">{SIDEBAR_LABEL[sidebar]}</SheetTitle>
+          </SheetHeader>
+          <div className="h-[calc(100vh-3.25rem)] overflow-hidden">
+            <SidebarBody
+              section={sidebar}
+              history={history}
+              snippets={snippets}
+              onInsert={(sql) => {
+                insertAtEditor(sql);
+                setMobileSidebarOpen(false);
+              }}
+              onLoadNewTab={(sql) => {
+                insertAtEditor(sql, true);
+                setMobileSidebarOpen(false);
+              }}
+              onClearHistory={clearHistory}
+              onDeleteSnippet={removeSnippet}
+              onOpenLearn={(sql) => {
+                openNewTab(sql);
+                setMobileSidebarOpen(false);
+              }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <AiTutorPanel
         isOpen={tutorOpen}
