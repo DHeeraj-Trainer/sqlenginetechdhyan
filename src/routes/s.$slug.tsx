@@ -27,7 +27,7 @@ export const Route = createFileRoute("/s/$slug")({
     // Cache-invalidation: admin actions that change a share (make_private,
     // delete) bump the row, and the next miss refetches; for an explicit
     // purge, delete the share from the admin panel.
-    const { setPublicCacheHeaders } = await import("@/lib/ssr-cache.server");
+    const { setPublicCacheHeaders } = await import("@/lib/ssr-cache");
     await setPublicCacheHeaders();
     return context.queryClient.ensureQueryData(sharedQueryOptions(params.slug));
   },
