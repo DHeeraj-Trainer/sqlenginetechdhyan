@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as ApiTutorChatStreamRouteImport } from './routes/api/tutor/chat-stream'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SSlugRoute = SSlugRouteImport.update({
+  id: '/s/$slug',
+  path: '/s/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTutorChatStreamRoute = ApiTutorChatStreamRouteImport.update({
   id: '/api/tutor/chat-stream',
   path: '/api/tutor/chat-stream',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/s/$slug': typeof SSlugRoute
   '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/s/$slug': typeof SSlugRoute
   '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,33 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/s/$slug': typeof SSlugRoute
   '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/reset-password' | '/api/tutor/chat-stream'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/reset-password'
+    | '/s/$slug'
+    | '/api/tutor/chat-stream'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/reset-password' | '/api/tutor/chat-stream'
-  id: '__root__' | '/' | '/auth' | '/reset-password' | '/api/tutor/chat-stream'
+  to: '/' | '/auth' | '/reset-password' | '/s/$slug' | '/api/tutor/chat-stream'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/reset-password'
+    | '/s/$slug'
+    | '/api/tutor/chat-stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SSlugRoute: typeof SSlugRoute
   ApiTutorChatStreamRoute: typeof ApiTutorChatStreamRoute
 }
 
@@ -92,6 +113,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/s/$slug': {
+      id: '/s/$slug'
+      path: '/s/$slug'
+      fullPath: '/s/$slug'
+      preLoaderRoute: typeof SSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tutor/chat-stream': {
       id: '/api/tutor/chat-stream'
       path: '/api/tutor/chat-stream'
@@ -106,6 +134,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SSlugRoute: SSlugRoute,
   ApiTutorChatStreamRoute: ApiTutorChatStreamRoute,
 }
 export const routeTree = rootRouteImport
