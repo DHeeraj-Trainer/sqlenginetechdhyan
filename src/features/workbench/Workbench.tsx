@@ -76,6 +76,9 @@ function WorkbenchInner() {
   const { engineId, switchEngine, status, error, tables } = useEngine();
   const [theme, setTheme] = usePersistedState<"light" | "dark">("wb.theme.v1", "light");
   const [sidebar, setSidebar] = useState<SidebarSection>("database");
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = usePersistedState<boolean>("wb.sidebar.open.v1", true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
   const [results, setResults] = useState<QueryResult[] | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
