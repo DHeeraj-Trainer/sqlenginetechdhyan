@@ -50,9 +50,19 @@ import {
 import type { EngineId, QueryResult } from "@/types/workbench";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAuth, signOut } from "@/hooks/use-auth";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 
 type SidebarSection = "database" | "history" | "snippets" | "learn";
+
+const SIDEBAR_LABEL: Record<SidebarSection, string> = {
+  database: "Database explorer",
+  history: "Query history",
+  snippets: "Saved snippets",
+  learn: "Learn",
+};
 
 export function Workbench() {
   return (
@@ -66,6 +76,9 @@ function WorkbenchInner() {
   const { engineId, switchEngine, status, error, tables } = useEngine();
   const [theme, setTheme] = usePersistedState<"light" | "dark">("wb.theme.v1", "light");
   const [sidebar, setSidebar] = useState<SidebarSection>("database");
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = usePersistedState<boolean>("wb.sidebar.open.v1", true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
   const [results, setResults] = useState<QueryResult[] | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
@@ -212,46 +225,79 @@ function WorkbenchInner() {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        <SidebarRail active={sidebar} onSelect={setSidebar} />
+        <SidebarRail
+          active={sidebar}
+          onSelect={(s) => {
+            setSidebar(s);
+            if (isMobile) setMobileSidebarOpen(true);
+            else if (!sidebarOpen) setSidebarOpen(true);
+          }}
+          collapsed={isMobile ? false : !sidebarOpen}
+          onToggleCollapse={
+            isMobile
+              ? () => setMobileSidebarOpen((v) => !v)
+              : () => setSidebarOpen((v) => !v)
+          }
+        />
 
         <PanelGroup orientation="horizontal" className="flex-1">
-          <Panel defaultSize={22} minSize={16} maxSize={40}>
-            <div className="h-full border-r">
-              {sidebar === "database" && (
-                <DatabaseExplorer onInsertQuery={(sql) => insertAtEditor(sql)} />
-              )}
-              {sidebar === "history" && (
-                <HistoryList
-                  history={history}
-                  onLoad={(sql) => insertAtEditor(sql, true)}
-                  onClear={clearHistory}
-                />
-              )}
-              {sidebar === "snippets" && (
-                <SnippetsList
-                  snippets={snippets}
-                  onLoad={(sql) => insertAtEditor(sql, true)}
-                  onDelete={removeSnippet}
-                />
-              )}
-              {sidebar === "learn" && (
-                <LearnPanel
-                  onOpenInEditor={(sql, filename) => {
-                    openNewTab(sql);
-                    if (filename && activeTab) {
-                      /* filename hint applied to newest tab in useEditorTabs */
-                    }
-                  }}
-                />
-              )}
-            </div>
-          </Panel>
-          <PanelResizeHandle className="w-1 bg-border/60 hover:bg-primary/40" />
+          {!isMobile && sidebarOpen && (
+            <>
+              <Panel
+
+
+                defaultSize={26}
+                minSize={20}
+                maxSize={48}
+                collapsible
+              >
+                <aside
+                  role="region"
+                  aria-label={SIDEBAR_LABEL[sidebar]}
+                  id={`sidebar-panel-${sidebar}`}
+                  className="flex h-full min-w-0 flex-col border-r bg-card"
+                >
+                  <div className="flex h-9 shrink-0 items-center justify-between border-b bg-muted/40 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <span className="truncate">{SIDEBAR_LABEL[sidebar]}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSidebarOpen(false)}
+                      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      aria-label="Collapse sidebar"
+                    >
+                      <PanelLeftClose className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <SidebarBody
+                      section={sidebar}
+                      history={history}
+                      snippets={snippets}
+                      onInsert={(sql) => insertAtEditor(sql)}
+                      onLoadNewTab={(sql) => insertAtEditor(sql, true)}
+                      onClearHistory={clearHistory}
+                      onDeleteSnippet={removeSnippet}
+                      onOpenLearn={(sql) => openNewTab(sql)}
+                    />
+                  </div>
+                </aside>
+              </Panel>
+              <PanelResizeHandle
+                className="w-1.5 bg-border/60 outline-none transition-colors hover:bg-primary/50 focus-visible:bg-primary"
+                aria-label="Resize sidebar"
+              />
+            </>
+          )}
 
           <Panel minSize={30}>
             <PanelGroup orientation="vertical">
               <Panel defaultSize={55} minSize={20}>
-                <div className="flex h-full flex-col" ref={editorRef}>
+                <section
+                  role="region"
+                  aria-label="SQL editor"
+                  className="flex h-full flex-col"
+                  ref={editorRef}
+                >
                   <EditorTabs
                     tabs={tabs}
                     activeId={activeTab?.id ?? ""}
@@ -279,11 +325,14 @@ function WorkbenchInner() {
                       />
                     )}
                   </div>
-                </div>
+                </section>
               </Panel>
-              <PanelResizeHandle className="h-1 bg-border/60 hover:bg-primary/40" />
+              <PanelResizeHandle
+                className="h-1.5 bg-border/60 outline-none transition-colors hover:bg-primary/50 focus-visible:bg-primary"
+                aria-label="Resize results"
+              />
               <Panel defaultSize={45} minSize={15}>
-                <div className="flex h-full flex-col">
+                <section role="region" aria-label="Query results" className="flex h-full flex-col">
                   <ResultsHeader
                     results={results}
                     activeIdx={activeResultIdx}
@@ -303,12 +352,42 @@ function WorkbenchInner() {
                       <EmptyResults status={status} engineError={error} />
                     )}
                   </div>
-                </div>
+                </section>
               </Panel>
             </PanelGroup>
           </Panel>
         </PanelGroup>
       </div>
+
+      {/* Mobile drawer sidebar */}
+      <Sheet open={isMobile && mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+        <SheetContent side="left" className="w-[min(88vw,340px)] p-0">
+          <SheetHeader className="border-b px-4 py-3">
+            <SheetTitle className="text-sm">{SIDEBAR_LABEL[sidebar]}</SheetTitle>
+          </SheetHeader>
+          <div className="h-[calc(100vh-3.25rem)] overflow-hidden">
+            <SidebarBody
+              section={sidebar}
+              history={history}
+              snippets={snippets}
+              onInsert={(sql) => {
+                insertAtEditor(sql);
+                setMobileSidebarOpen(false);
+              }}
+              onLoadNewTab={(sql) => {
+                insertAtEditor(sql, true);
+                setMobileSidebarOpen(false);
+              }}
+              onClearHistory={clearHistory}
+              onDeleteSnippet={removeSnippet}
+              onOpenLearn={(sql) => {
+                openNewTab(sql);
+                setMobileSidebarOpen(false);
+              }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <AiTutorPanel
         isOpen={tutorOpen}
@@ -477,7 +556,17 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
   );
 }
 
-function SidebarRail({ active, onSelect }: { active: SidebarSection; onSelect: (s: SidebarSection) => void }) {
+function SidebarRail({
+  active,
+  onSelect,
+  collapsed,
+  onToggleCollapse,
+}: {
+  active: SidebarSection;
+  onSelect: (s: SidebarSection) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
   const items: { id: SidebarSection; label: string; icon: React.ReactNode }[] = [
     { id: "database", label: "Database", icon: <Database className="h-4 w-4" /> },
     { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
@@ -485,22 +574,84 @@ function SidebarRail({ active, onSelect }: { active: SidebarSection; onSelect: (
     { id: "learn", label: "Learn", icon: <GraduationCap className="h-4 w-4" /> },
   ];
   return (
-    <nav className="flex w-12 flex-col items-center gap-1 border-r bg-muted/40 py-2">
-      {items.map((i) => (
-        <button
-          key={i.id}
-          onClick={() => onSelect(i.id)}
-          title={i.label}
-          className={`flex h-10 w-10 items-center justify-center rounded ${
-            active === i.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-          }`}
-          aria-label={i.label}
-          aria-current={active === i.id}
-        >
-          {i.icon}
-        </button>
-      ))}
+    <nav
+      aria-label="Workbench sections"
+      className="flex w-12 shrink-0 flex-col items-center gap-1 border-r bg-muted/40 py-2"
+    >
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        aria-label={collapsed ? "Open sidebar" : "Close sidebar"}
+        aria-expanded={!collapsed}
+        aria-controls={`sidebar-panel-${active}`}
+        className="mb-1 flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+      </button>
+      <div role="tablist" aria-orientation="vertical" className="flex flex-col gap-1">
+        {items.map((i) => {
+          const selected = active === i.id;
+          return (
+            <button
+              key={i.id}
+              role="tab"
+              type="button"
+              onClick={() => onSelect(i.id)}
+              title={i.label}
+              aria-selected={selected}
+              aria-controls={`sidebar-panel-${i.id}`}
+              tabIndex={selected ? 0 : -1}
+              className={`flex h-10 w-10 items-center justify-center rounded transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${
+                selected
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {i.icon}
+              <span className="sr-only">{i.label}</span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
+  );
+}
+
+function SidebarBody({
+  section,
+  history,
+  snippets,
+  onInsert,
+  onLoadNewTab,
+  onClearHistory,
+  onDeleteSnippet,
+  onOpenLearn,
+}: {
+  section: SidebarSection;
+  history: ReturnType<typeof useQueryHistory>["history"];
+  snippets: ReturnType<typeof useSavedSnippets>["snippets"];
+  onInsert: (sql: string) => void;
+  onLoadNewTab: (sql: string) => void;
+  onClearHistory: () => void;
+  onDeleteSnippet: (id: string) => void;
+  onOpenLearn: (sql: string) => void;
+}) {
+  return (
+    <div
+      role="tabpanel"
+      id={`sidebar-panel-${section}`}
+      aria-label={SIDEBAR_LABEL[section]}
+      className="h-full"
+    >
+      {section === "database" && <DatabaseExplorer onInsertQuery={onInsert} />}
+      {section === "history" && (
+        <HistoryList history={history} onLoad={onLoadNewTab} onClear={onClearHistory} />
+      )}
+      {section === "snippets" && (
+        <SnippetsList snippets={snippets} onLoad={onLoadNewTab} onDelete={onDeleteSnippet} />
+      )}
+      {section === "learn" && <LearnPanel onOpenInEditor={(sql) => onOpenLearn(sql)} />}
+    </div>
   );
 }
 
@@ -519,28 +670,38 @@ function EditorTabs({
 }) {
   return (
     <div className="flex items-center gap-0 border-b bg-muted/20 pr-2">
-      <ul className="flex overflow-x-auto">
-        {tabs.map((t) => (
-          <li key={t.id}>
+      <div role="tablist" aria-label="Query tabs" className="flex overflow-x-auto">
+        {tabs.map((t) => {
+          const selected = activeId === t.id;
+          return (
             <div
+              key={t.id}
               className={`group flex items-center gap-1 border-r px-3 py-1.5 text-xs ${
-                activeId === t.id ? "bg-background font-semibold" : "hover:bg-muted/40"
+                selected ? "bg-background font-semibold" : "hover:bg-muted/40"
               }`}
             >
-              <button onClick={() => onSelect(t.id)} className="whitespace-nowrap font-mono">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => onSelect(t.id)}
+                className="whitespace-nowrap font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 {t.name}
               </button>
               <button
+                type="button"
                 onClick={() => onClose(t.id)}
-                className="rounded p-0.5 opacity-0 hover:bg-muted group-hover:opacity-100"
+                className="rounded p-0.5 opacity-70 hover:bg-muted focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 sm:opacity-0"
                 aria-label={`Close ${t.name}`}
               >
                 <X className="h-3 w-3" />
               </button>
             </div>
-          </li>
-        ))}
-      </ul>
+          );
+        })}
+      </div>
       <button
         onClick={onNew}
         title="New query"
