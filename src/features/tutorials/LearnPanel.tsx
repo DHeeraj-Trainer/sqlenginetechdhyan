@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useMemo, useState } from "react";
-import { BookOpen, CheckCircle2, ChevronRight, Eye, EyeOff, GraduationCap, HelpCircle, Loader2, Lock, Play } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, ChevronRight, Eye, EyeOff, GraduationCap, HelpCircle, Loader2, Lock, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getLegacyDomains, getLegacyChapters, legacySyllabus } from "./legacy-adapter";
