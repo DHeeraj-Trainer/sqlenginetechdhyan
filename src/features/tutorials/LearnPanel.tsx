@@ -41,8 +41,8 @@ export function LearnPanel({ onOpenInEditor }: Props) {
         </div>
 
         <TabsContent value="domains" className="m-0 flex-1 overflow-hidden">
-          <div className="flex h-full min-h-0 flex-col md:grid md:grid-cols-[220px_1fr]">
-            <ul className="max-h-40 shrink-0 overflow-y-auto border-b text-xs md:max-h-none md:border-b-0 md:border-r">
+          <div className="flex h-full min-h-0 flex-col">
+            <ul className="max-h-40 shrink-0 overflow-y-auto border-b text-xs">
               {domains.map((d) => (
                 <li key={d.id}>
                   <button
@@ -56,7 +56,7 @@ export function LearnPanel({ onOpenInEditor }: Props) {
                 </li>
               ))}
             </ul>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm sm:p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm">
               {domain && <DomainDetail domain={domain} onOpenInEditor={onOpenInEditor} />}
             </div>
           </div>
