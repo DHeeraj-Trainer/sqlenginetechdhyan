@@ -73,7 +73,7 @@ export function Workbench() {
 }
 
 function WorkbenchInner() {
-  const { engineId, switchEngine, status, error, tables } = useEngine();
+  const { engineId, switchEngine, status, error, tables, routerState } = useEngine();
   const [theme, setTheme] = usePersistedState<"light" | "dark">("wb.theme.v1", "light");
   const [sidebar, setSidebar] = useState<SidebarSection>("database");
   const isMobile = useIsMobile();
@@ -290,7 +290,18 @@ function WorkbenchInner() {
 
           <Panel minSize={30}>
             <div className="flex h-full flex-col">
-              <div className="flex h-8 shrink-0 items-center justify-end gap-2 border-b bg-muted/30 px-2 text-xs">
+              <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b bg-muted/30 px-2 text-xs">
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span title="Current session user">
+                    <UserIcon className="inline h-3 w-3 mr-1" />{routerState.currentUser}
+                  </span>
+                  <span title="Autocommit state" className={routerState.autocommit ? "" : "text-amber-600 dark:text-amber-400 font-medium"}>
+                    AUTOCOMMIT: {routerState.autocommit ? "ON" : "OFF"}
+                  </span>
+                  <span title="Transaction depth">
+                    Tx: {routerState.txDepth}{routerState.savepoints.length ? ` (${routerState.savepoints.length} savepoint${routerState.savepoints.length === 1 ? "" : "s"})` : ""}
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setEditorHidden((v) => !v)}
@@ -301,6 +312,7 @@ function WorkbenchInner() {
                   {editorHidden ? "Show editor" : "Hide editor"}
                 </button>
               </div>
+
               <div className="min-h-0 flex-1">
                 <PanelGroup orientation="vertical">
                   {!editorHidden && (

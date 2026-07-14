@@ -13,6 +13,8 @@ import {
   loadCatalog,
   type CatalogSnapshot,
 } from "@/lib/db/catalog";
+import { SqlSession, type RouterState } from "@/lib/db/sql-router";
+
 
 
 interface EngineContextValue {
@@ -23,12 +25,15 @@ interface EngineContextValue {
   tables: TableInfo[];
   catalog: CatalogSnapshot;
   currentSampleId: string;
+  session: SqlSession;
+  routerState: RouterState;
   switchEngine: (id: EngineId) => Promise<void>;
   loadSample: (sampleId: string) => Promise<void>;
   refreshTables: () => Promise<void>;
   refreshCatalog: () => Promise<void>;
   runQuery: (sql: string) => Promise<{ results: QueryResult[] | null; error: string | null; durationMs: number }>;
 }
+
 
 
 const EngineContext = createContext<EngineContextValue | null>(null);
@@ -48,6 +53,14 @@ export function EngineProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<CatalogSnapshot>(() => emptyCatalog("sqlite"));
   const [currentSampleId, setCurrentSampleId] = useState<string>(sampleDatabases[0].id);
   const engineRef = useRef<SqlEngine | null>(null);
+  const sessionRef = useRef<SqlSession>(new SqlSession());
+  const [routerState, setRouterState] = useState<RouterState>(() => sessionRef.current.snapshot() as RouterState);
+
+  useEffect(() => {
+    const unsub = sessionRef.current.subscribe((s) => setRouterState({ ...s }));
+    return () => { unsub(); };
+  }, []);
+
 
   const refreshCatalog = useCallback(async () => {
     if (!engineRef.current) return;
@@ -134,27 +147,13 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     async (sql: string) => {
       const inst = engineRef.current;
       if (!inst) return { results: null, error: "Engine not ready", durationMs: 0 };
-      const start = performance.now();
-      try {
-        const results = await inst.exec(sql);
-        const durationMs = performance.now() - start;
-        // Refresh catalog if statement mutated schema or data.
-        if (isSchemaChanging(sql) || isDataChanging(sql)) {
-          void refreshCatalog();
-        }
-
-        return { results, error: null, durationMs };
-      } catch (e) {
-        const durationMs = performance.now() - start;
-        return {
-          results: null,
-          error: e instanceof Error ? e.message : String(e),
-          durationMs,
-        };
-      }
+      const out = await sessionRef.current.execute(sql, inst);
+      if (isSchemaChanging(sql) || isDataChanging(sql)) void refreshCatalog();
+      return out.error
+        ? { results: null, error: out.error, durationMs: out.durationMs }
+        : { results: out.results, error: null, durationMs: out.durationMs };
     },
     [refreshCatalog],
-
   );
 
   const value = useMemo<EngineContextValue>(
@@ -166,14 +165,17 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       tables,
       catalog,
       currentSampleId,
+      session: sessionRef.current,
+      routerState,
       switchEngine,
       loadSample,
       refreshTables,
       refreshCatalog,
       runQuery,
     }),
-    [engineId, engine, status, error, tables, catalog, currentSampleId, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery],
+    [engineId, engine, status, error, tables, catalog, currentSampleId, routerState, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery],
   );
+
 
 
   return <EngineContext.Provider value={value}>{children}</EngineContext.Provider>;
