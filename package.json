@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
-    "build:dev": "vite build --mode development",
+    "build": "node scripts/check-routetree.mjs && vite build",
+    "build:dev": "node scripts/check-routetree.mjs && vite build --mode development",
+    "check:routetree": "node scripts/check-routetree.mjs",
+    "test:smoke": "node tests/e2e/smoke.spec.mjs",
     "preview": "vite preview",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
