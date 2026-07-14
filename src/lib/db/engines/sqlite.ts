@@ -132,6 +132,7 @@ function splitStatements(sql: string): string[] {
   let cur = "";
   let inSingle = false;
   let inDouble = false;
+  let beginDepth = 0;
   for (let i = 0; i < sql.length; i++) {
     const ch = sql[i];
     const next = sql[i + 1];
@@ -155,7 +156,31 @@ function splitStatements(sql: string): string[] {
     }
     if (ch === "'" && !inDouble) inSingle = !inSingle;
     else if (ch === '"' && !inSingle) inDouble = !inDouble;
-    if (ch === ";" && !inSingle && !inDouble) {
+    // Track BEGIN...END blocks (e.g. CREATE TRIGGER bodies) so their
+    // internal semicolons don't terminate the outer statement.
+    if (!inSingle && !inDouble) {
+      const prevOk = i === 0 || /\W/.test(sql[i - 1]);
+      if (prevOk) {
+        const rest = sql.slice(i);
+        const beginMatch = /^begin\b/i.exec(rest);
+        if (beginMatch) {
+          beginDepth++;
+          cur += beginMatch[0];
+          i += beginMatch[0].length - 1;
+          continue;
+        }
+        if (beginDepth > 0) {
+          const endMatch = /^end\b/i.exec(rest);
+          if (endMatch) {
+            beginDepth--;
+            cur += endMatch[0];
+            i += endMatch[0].length - 1;
+            continue;
+          }
+        }
+      }
+    }
+    if (ch === ";" && !inSingle && !inDouble && beginDepth === 0) {
       out.push(cur);
       cur = "";
       continue;
