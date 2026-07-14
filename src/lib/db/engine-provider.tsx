@@ -53,6 +53,14 @@ export function EngineProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<CatalogSnapshot>(() => emptyCatalog("sqlite"));
   const [currentSampleId, setCurrentSampleId] = useState<string>(sampleDatabases[0].id);
   const engineRef = useRef<SqlEngine | null>(null);
+  const sessionRef = useRef<SqlSession>(new SqlSession());
+  const [routerState, setRouterState] = useState<RouterState>(() => sessionRef.current.snapshot() as RouterState);
+
+  useEffect(() => {
+    const unsub = sessionRef.current.subscribe((s) => setRouterState({ ...s }));
+    return () => { unsub(); };
+  }, []);
+
 
   const refreshCatalog = useCallback(async () => {
     if (!engineRef.current) return;
