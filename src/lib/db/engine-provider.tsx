@@ -161,14 +161,17 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       status,
       error,
       tables,
+      catalog,
       currentSampleId,
       switchEngine,
       loadSample,
       refreshTables,
+      refreshCatalog,
       runQuery,
     }),
-    [engineId, engine, status, error, tables, currentSampleId, switchEngine, loadSample, refreshTables, runQuery],
+    [engineId, engine, status, error, tables, catalog, currentSampleId, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery],
   );
+
 
   return <EngineContext.Provider value={value}>{children}</EngineContext.Provider>;
 }
