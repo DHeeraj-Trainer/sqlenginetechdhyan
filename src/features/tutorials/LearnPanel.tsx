@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useMemo, useState } from "react";
-import { BookOpen, CheckCircle2, ChevronRight, Eye, EyeOff, GraduationCap, HelpCircle, Loader2, Lock, Play } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, ChevronRight, Eye, EyeOff, GraduationCap, HelpCircle, Loader2, Lock, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getLegacyDomains, getLegacyChapters, legacySyllabus } from "./legacy-adapter";
@@ -322,6 +322,8 @@ function AdvancedTrack({
             domainLoaded={loadedId === domain.id}
             ensureLoaded={ensureLoaded}
             onSolved={() => markSolved(q.id)}
+            nextId={advanced[i + 1]?.id ?? null}
+            isFinal={i === advanced.length - 1}
           />
         ))}
       </ul>
@@ -337,6 +339,24 @@ function normalizeRows(rows: unknown[][]): string {
   return asStrings.join("|");
 }
 
+function explainQuery(sql: string): string {
+  const s = sql.toUpperCase();
+  const bits: string[] = [];
+  if (s.includes("WITH ")) bits.push("Uses a CTE (WITH clause) to name an intermediate result set before the final SELECT.");
+  if (/UNION\s+ALL/.test(s)) bits.push("Combines multiple SELECTs with UNION ALL (keeps duplicates, one row per input).");
+  else if (s.includes("UNION")) bits.push("Combines SELECTs with UNION (deduplicates rows).");
+  if (s.includes("GROUP BY")) bits.push("Groups rows so aggregate functions (COUNT/SUM/AVG) can be computed per group.");
+  if (s.includes("HAVING")) bits.push("Filters groups after aggregation using HAVING.");
+  if (s.includes("COUNT(DISTINCT")) bits.push("COUNT(DISTINCT …) counts unique values — used here to detect duplicates.");
+  if (/JOIN/.test(s)) bits.push("Uses a JOIN to correlate rows across tables.");
+  if (/\bA\.[A-Z_]+\s*<\s*B\./.test(s) || /FROM\s+\w+\s+A\s*,\s*\w+\s+B/.test(s)) bits.push("Self-join with an inequality (a.pk < b.pk) counts unordered pairs exactly once.");
+  if (s.includes("CASE ")) bits.push("Uses CASE to produce a conditional value per row.");
+  if (s.includes("ORDER BY")) bits.push("ORDER BY controls the final row order.");
+  if (/\bIN\s*\(SELECT/.test(s)) bits.push("Uses a subquery in IN (…) to filter by a set of values.");
+  if (!bits.length) bits.push("Straight SELECT with aggregation / filtering.");
+  return bits.join(" ");
+}
+
 function AdvancedCard({
   q,
   index,
@@ -344,6 +364,8 @@ function AdvancedCard({
   domainLoaded,
   ensureLoaded,
   onSolved,
+  nextId,
+  isFinal,
 }: {
   q: any;
   index: number;
@@ -351,11 +373,15 @@ function AdvancedCard({
   domainLoaded: boolean;
   ensureLoaded: () => Promise<boolean>;
   onSolved: () => void;
+  nextId: string | null;
+  isFinal: boolean;
 }) {
   const { runQuery } = useEngine();
   const [sql, setSql] = useState("");
   const [showSolution, setShowSolution] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempts, setAttempts] = useState(0);
   const [feedback, setFeedback] = useState<
     | { kind: "ok"; msg: string }
     | { kind: "err"; msg: string; detail?: string }
@@ -364,6 +390,16 @@ function AdvancedCard({
 
   const locked = state === "locked";
   const solved = state === "solved";
+
+  const goNext = () => {
+    if (!nextId) return;
+    const el = document.getElementById(`adv-card-${nextId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-primary");
+      setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 1600);
+    }
+  };
 
   const verify = async () => {
     if (!sql.trim()) {
@@ -382,6 +418,8 @@ function AdvancedCard({
       }
       const [mine, ref] = await Promise.all([runQuery(sql), runQuery(q.expectedQuery)]);
       if (mine.error) {
+        setAttempts((a) => a + 1);
+        setFailed(true);
         setFeedback({ kind: "err", msg: "Your SQL errored.", detail: mine.error });
         return;
       }
@@ -396,6 +434,8 @@ function AdvancedCard({
       const mineLast = mine.results?.[mine.results.length - 1];
       const refLast = ref.results[ref.results.length - 1];
       if (!mineLast) {
+        setAttempts((a) => a + 1);
+        setFailed(true);
         setFeedback({ kind: "err", msg: "Your query returned no result set." });
         return;
       }
@@ -404,6 +444,7 @@ function AdvancedCard({
         mineLast.columns.length === refLast.columns.length &&
         mineLast.rows.length === refLast.rows.length;
       if (okRows && okCols) {
+        setFailed(false);
         setFeedback({
           kind: "ok",
           msg: `Correct! ${mineLast.rows.length} row(s), ${mine.durationMs.toFixed(0)}ms.`,
@@ -411,6 +452,8 @@ function AdvancedCard({
         onSolved();
         toast.success(`Challenge ${q.id} solved`);
       } else {
+        setAttempts((a) => a + 1);
+        setFailed(true);
         setFeedback({
           kind: "err",
           msg: "Result doesn't match the reference.",
@@ -418,15 +461,20 @@ function AdvancedCard({
         });
       }
     } catch (e) {
+      setAttempts((a) => a + 1);
+      setFailed(true);
       setFeedback({ kind: "err", msg: (e as Error).message });
     } finally {
       setBusy(false);
     }
   };
 
+  const revealRef = showSolution || failed;
+
   return (
     <li
-      className={`rounded border p-3 ${
+      id={`adv-card-${q.id}`}
+      className={`rounded border p-3 transition-shadow ${
         solved ? "border-emerald-500/60 bg-emerald-500/5" : locked ? "opacity-60" : ""
       }`}
     >
@@ -460,20 +508,20 @@ function AdvancedCard({
               {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
               Verify
             </Button>
-            <button
-              type="button"
-              onClick={() => setShowSolution((v) => !v)}
-              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              {showSolution ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              {showSolution ? "Hide reference" : "Reveal reference"}
-            </button>
+            {!failed && (
+              <button
+                type="button"
+                onClick={() => setShowSolution((v) => !v)}
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                {showSolution ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                {showSolution ? "Hide reference" : "Reveal reference"}
+              </button>
+            )}
+            {attempts > 0 && (
+              <span className="text-[11px] text-muted-foreground">Attempts: {attempts}</span>
+            )}
           </div>
-          {showSolution && (
-            <pre className="mt-2 overflow-x-auto rounded bg-slate-950 p-2 text-[11px] leading-relaxed text-slate-100">
-              <code>{q.expectedQuery}</code>
-            </pre>
-          )}
           {feedback && (
             <div
               className={`mt-2 rounded border p-2 text-xs ${
@@ -490,13 +538,40 @@ function AdvancedCard({
               ) : null}
             </div>
           )}
+          {revealRef && (
+            <div className="mt-2 space-y-2">
+              {failed && (
+                <div className="rounded border border-amber-500/60 bg-amber-500/10 p-2 text-[11px] text-amber-800 dark:text-amber-200">
+                  <div className="mb-1 font-semibold uppercase tracking-wide">
+                    Reference solution & explanation
+                  </div>
+                  <p className="leading-relaxed">{explainQuery(q.expectedQuery)}</p>
+                </div>
+              )}
+              <pre className="overflow-x-auto rounded bg-slate-950 p-2 text-[11px] leading-relaxed text-slate-100 select-text">
+                <code>{q.expectedQuery}</code>
+              </pre>
+              {failed && (
+                <p className="text-[11px] text-muted-foreground">
+                  Read the reference, then edit your SQL above and click Verify again.
+                </p>
+              )}
+            </div>
+          )}
         </>
       )}
 
       {solved && (
-        <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
-          Solved. Next challenge unlocked.
-        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-emerald-700 dark:text-emerald-300">
+            Solved. {isFinal ? "You finished the advanced track!" : "Next challenge unlocked."}
+          </p>
+          {!isFinal && nextId && (
+            <Button size="sm" variant="secondary" onClick={goNext}>
+              Next tough challenge <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       )}
       {locked && (
         <p className="mt-2 text-xs text-muted-foreground">
