@@ -562,12 +562,12 @@ function AdvancedCard({
       )}
 
       {solved && (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-emerald-700 dark:text-emerald-300">
+        <div className="mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <p className="min-w-0 text-xs text-emerald-700 dark:text-emerald-300">
             Solved. {isFinal ? "You finished the advanced track!" : "Next challenge unlocked."}
           </p>
           {!isFinal && nextId && (
-            <Button size="sm" variant="secondary" onClick={goNext}>
+            <Button size="sm" variant="secondary" onClick={goNext} className="w-full sm:w-auto">
               Next tough challenge <ArrowRight className="ml-1 h-3.5 w-3.5" />
             </Button>
           )}
