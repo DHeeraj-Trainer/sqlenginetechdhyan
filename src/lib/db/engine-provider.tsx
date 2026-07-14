@@ -21,12 +21,15 @@ interface EngineContextValue {
   status: "idle" | "loading" | "ready" | "error";
   error: string | null;
   tables: TableInfo[];
+  catalog: CatalogSnapshot;
   currentSampleId: string;
   switchEngine: (id: EngineId) => Promise<void>;
   loadSample: (sampleId: string) => Promise<void>;
   refreshTables: () => Promise<void>;
+  refreshCatalog: () => Promise<void>;
   runQuery: (sql: string) => Promise<{ results: QueryResult[] | null; error: string | null; durationMs: number }>;
 }
+
 
 const EngineContext = createContext<EngineContextValue | null>(null);
 
