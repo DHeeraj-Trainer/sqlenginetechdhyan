@@ -6,6 +6,14 @@ import { PostgresEngine } from "@/lib/db/engines/postgres";
 import { AlaSqlEngine } from "@/lib/db/engines/alasql";
 import { buildScript } from "@/lib/db/sample-builder";
 import { sampleDatabases } from "@/lib/db/sample-databases";
+import {
+  emptyCatalog,
+  isDataChanging,
+  isSchemaChanging,
+  loadCatalog,
+  type CatalogSnapshot,
+} from "@/lib/db/catalog";
+
 
 interface EngineContextValue {
   engineId: EngineId;
