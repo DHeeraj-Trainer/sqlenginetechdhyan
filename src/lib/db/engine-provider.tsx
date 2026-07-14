@@ -6,6 +6,14 @@ import { PostgresEngine } from "@/lib/db/engines/postgres";
 import { AlaSqlEngine } from "@/lib/db/engines/alasql";
 import { buildScript } from "@/lib/db/sample-builder";
 import { sampleDatabases } from "@/lib/db/sample-databases";
+import {
+  emptyCatalog,
+  isDataChanging,
+  isSchemaChanging,
+  loadCatalog,
+  type CatalogSnapshot,
+} from "@/lib/db/catalog";
+
 
 interface EngineContextValue {
   engineId: EngineId;
@@ -13,12 +21,15 @@ interface EngineContextValue {
   status: "idle" | "loading" | "ready" | "error";
   error: string | null;
   tables: TableInfo[];
+  catalog: CatalogSnapshot;
   currentSampleId: string;
   switchEngine: (id: EngineId) => Promise<void>;
   loadSample: (sampleId: string) => Promise<void>;
   refreshTables: () => Promise<void>;
+  refreshCatalog: () => Promise<void>;
   runQuery: (sql: string) => Promise<{ results: QueryResult[] | null; error: string | null; durationMs: number }>;
 }
+
 
 const EngineContext = createContext<EngineContextValue | null>(null);
 
@@ -34,18 +45,30 @@ export function EngineProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [tables, setTables] = useState<TableInfo[]>([]);
+  const [catalog, setCatalog] = useState<CatalogSnapshot>(() => emptyCatalog("sqlite"));
   const [currentSampleId, setCurrentSampleId] = useState<string>(sampleDatabases[0].id);
   const engineRef = useRef<SqlEngine | null>(null);
 
-  const refreshTables = useCallback(async () => {
+  const refreshCatalog = useCallback(async () => {
     if (!engineRef.current) return;
     try {
-      const t = await engineRef.current.listTables();
-      setTables(t);
+      const snap = await loadCatalog(engineRef.current);
+      setCatalog(snap);
+      // Keep the flat tables list in sync for legacy consumers.
+      const flat: TableInfo[] = [];
+      for (const s of snap.schemas) {
+        for (const t of [...s.tables, ...s.views, ...s.materializedViews]) {
+          flat.push({ name: t.name, kind: t.kind === "view" ? "view" : "table", columns: t.columns });
+        }
+      }
+      setTables(flat);
     } catch (e) {
-      console.error("listTables failed", e);
+      console.error("refreshCatalog failed", e);
     }
   }, []);
+
+  const refreshTables = refreshCatalog;
+
 
   const loadSample = useCallback(
     async (sampleId: string) => {
@@ -82,15 +105,16 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         const sample = sampleDatabases.find((s) => s.id === currentSampleId) ?? sampleDatabases[0];
         await inst.loadScript(buildScript(sample, inst.id));
         setCurrentSampleId(sample.id);
-        const t = await inst.listTables();
-        setTables(t);
+        await refreshCatalog();
         setStatus("ready");
+
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setStatus("error");
       }
     },
-    [currentSampleId],
+    [currentSampleId, refreshCatalog],
+
   );
 
   useEffect(() => {
@@ -114,10 +138,11 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       try {
         const results = await inst.exec(sql);
         const durationMs = performance.now() - start;
-        // Refresh schema if statement likely mutated it.
-        if (/\b(create|drop|alter|insert|update|delete|truncate)\b/i.test(sql)) {
-          void refreshTables();
+        // Refresh catalog if statement mutated schema or data.
+        if (isSchemaChanging(sql) || isDataChanging(sql)) {
+          void refreshCatalog();
         }
+
         return { results, error: null, durationMs };
       } catch (e) {
         const durationMs = performance.now() - start;
@@ -128,7 +153,8 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         };
       }
     },
-    [refreshTables],
+    [refreshCatalog],
+
   );
 
   const value = useMemo<EngineContextValue>(
@@ -138,14 +164,17 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       status,
       error,
       tables,
+      catalog,
       currentSampleId,
       switchEngine,
       loadSample,
       refreshTables,
+      refreshCatalog,
       runQuery,
     }),
-    [engineId, engine, status, error, tables, currentSampleId, switchEngine, loadSample, refreshTables, runQuery],
+    [engineId, engine, status, error, tables, catalog, currentSampleId, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery],
   );
+
 
   return <EngineContext.Provider value={value}>{children}</EngineContext.Provider>;
 }
