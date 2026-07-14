@@ -322,6 +322,8 @@ function AdvancedTrack({
             domainLoaded={loadedId === domain.id}
             ensureLoaded={ensureLoaded}
             onSolved={() => markSolved(q.id)}
+            nextId={advanced[i + 1]?.id ?? null}
+            isFinal={i === advanced.length - 1}
           />
         ))}
       </ul>
