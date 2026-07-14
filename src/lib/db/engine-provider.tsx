@@ -13,6 +13,8 @@ import {
   loadCatalog,
   type CatalogSnapshot,
 } from "@/lib/db/catalog";
+import { SqlSession, type RouterState } from "@/lib/db/sql-router";
+
 
 
 interface EngineContextValue {
