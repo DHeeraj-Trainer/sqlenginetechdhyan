@@ -189,7 +189,7 @@ function WorkbenchInner() {
   const activeResult = results?.[activeResultIdx];
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <TopBar
         engineId={engineId}
         onSwitchEngine={switchEngine}
