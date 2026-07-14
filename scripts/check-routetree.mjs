@@ -40,7 +40,8 @@ function fileToRouteId(filePath) {
   const rel = relative(ROUTES_DIR, filePath).replace(/\\/g, "/").replace(/\.(tsx?|jsx?)$/, "");
   if (rel === "__root") return null; // root route is implicit
   const segments = rel.split("/").flatMap((seg) => seg.split("."));
-  const cleaned = segments.filter((s) => s !== "index");
+  // `route.tsx` inside a folder marks the layout for that folder — no extra segment.
+  const cleaned = segments.filter((s) => s !== "index" && s !== "route");
   if (cleaned.length === 0) return "/";
   return "/" + cleaned.join("/");
 }
