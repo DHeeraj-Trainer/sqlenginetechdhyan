@@ -215,14 +215,19 @@ function DomainDetail({
 
       <section>
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Challenges ({domain.questions.length}) — solve without peeking
+          Challenges ({domain.questions.length}) — write, verify, and move on
         </h3>
         <ul className="space-y-2">
-          {domain.questions.map((q) => (
-            <ChallengeCard
+          {domain.questions.map((q, i) => (
+            <BeginnerCard
               key={q.id}
               q={q}
-              onStart={() => startChallenge(q)}
+              index={i}
+              domainLoaded={loadedId === domain.id}
+              ensureLoaded={loadDomain}
+              onOpenInEditor={() => startChallenge(q)}
+              nextId={domain.questions[i + 1]?.id ?? null}
+              isFinal={i === domain.questions.length - 1}
             />
           ))}
         </ul>
