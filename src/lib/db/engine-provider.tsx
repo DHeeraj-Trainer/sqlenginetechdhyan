@@ -25,12 +25,15 @@ interface EngineContextValue {
   tables: TableInfo[];
   catalog: CatalogSnapshot;
   currentSampleId: string;
+  session: SqlSession;
+  routerState: RouterState;
   switchEngine: (id: EngineId) => Promise<void>;
   loadSample: (sampleId: string) => Promise<void>;
   refreshTables: () => Promise<void>;
   refreshCatalog: () => Promise<void>;
   runQuery: (sql: string) => Promise<{ results: QueryResult[] | null; error: string | null; durationMs: number }>;
 }
+
 
 
 const EngineContext = createContext<EngineContextValue | null>(null);
