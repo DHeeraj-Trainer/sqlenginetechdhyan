@@ -143,17 +143,42 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     [bootEngine, engineId, status],
   );
 
+  // Debounce catalog refreshes triggered by DML: bulk INSERT/UPDATE scripts
+  // would otherwise re-introspect the whole database after every statement.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefresh = useCallback(
+    (immediate: boolean) => {
+      if (immediate) {
+        if (refreshTimer.current) clearTimeout(refreshTimer.current);
+        refreshTimer.current = null;
+        void refreshCatalog();
+        return;
+      }
+      if (refreshTimer.current) return; // trailing debounce
+      refreshTimer.current = setTimeout(() => {
+        refreshTimer.current = null;
+        void refreshCatalog();
+      }, 250);
+    },
+    [refreshCatalog],
+  );
+
+  useEffect(() => () => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+  }, []);
+
   const runQuery = useCallback(
     async (sql: string) => {
       const inst = engineRef.current;
       if (!inst) return { results: null, error: "Engine not ready", durationMs: 0 };
       const out = await sessionRef.current.execute(sql, inst);
-      if (isSchemaChanging(sql) || isDataChanging(sql)) void refreshCatalog();
+      if (isSchemaChanging(sql)) scheduleRefresh(true);
+      else if (isDataChanging(sql)) scheduleRefresh(false);
       return out.error
         ? { results: null, error: out.error, durationMs: out.durationMs }
         : { results: out.results, error: null, durationMs: out.durationMs };
     },
-    [refreshCatalog],
+    [scheduleRefresh],
   );
 
   const value = useMemo<EngineContextValue>(
