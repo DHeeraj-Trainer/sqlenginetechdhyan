@@ -147,27 +147,13 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     async (sql: string) => {
       const inst = engineRef.current;
       if (!inst) return { results: null, error: "Engine not ready", durationMs: 0 };
-      const start = performance.now();
-      try {
-        const results = await inst.exec(sql);
-        const durationMs = performance.now() - start;
-        // Refresh catalog if statement mutated schema or data.
-        if (isSchemaChanging(sql) || isDataChanging(sql)) {
-          void refreshCatalog();
-        }
-
-        return { results, error: null, durationMs };
-      } catch (e) {
-        const durationMs = performance.now() - start;
-        return {
-          results: null,
-          error: e instanceof Error ? e.message : String(e),
-          durationMs,
-        };
-      }
+      const out = await sessionRef.current.execute(sql, inst);
+      if (isSchemaChanging(sql) || isDataChanging(sql)) void refreshCatalog();
+      return out.error
+        ? { results: null, error: out.error, durationMs: out.durationMs }
+        : { results: out.results, error: null, durationMs: out.durationMs };
     },
     [refreshCatalog],
-
   );
 
   const value = useMemo<EngineContextValue>(
@@ -179,14 +165,17 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       tables,
       catalog,
       currentSampleId,
+      session: sessionRef.current,
+      routerState,
       switchEngine,
       loadSample,
       refreshTables,
       refreshCatalog,
       runQuery,
     }),
-    [engineId, engine, status, error, tables, catalog, currentSampleId, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery],
+    [engineId, engine, status, error, tables, catalog, currentSampleId, routerState, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery],
   );
+
 
 
   return <EngineContext.Provider value={value}>{children}</EngineContext.Provider>;
