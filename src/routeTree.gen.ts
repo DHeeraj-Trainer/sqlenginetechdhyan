@@ -17,6 +17,7 @@ import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiTutorChatStreamRouteImport } from './routes/api/tutor/chat-stream'
+import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminContentRouteImport } from './routes/_authenticated/admin.content'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
@@ -60,6 +61,11 @@ const ApiTutorChatStreamRoute = ApiTutorChatStreamRouteImport.update({
   path: '/api/tutor/chat-stream',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
+  id: '/api/public/health',
+  path: '/api/public/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/content': typeof AuthenticatedAdminContentRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/content': typeof AuthenticatedAdminContentRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
 }
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/_authenticated/admin/content': typeof AuthenticatedAdminContentRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/api/tutor/chat-stream': typeof ApiTutorChatStreamRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
 }
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/content'
     | '/admin/users'
+    | '/api/public/health'
     | '/api/tutor/chat-stream'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/content'
     | '/admin/users'
+    | '/api/public/health'
     | '/api/tutor/chat-stream'
     | '/admin'
   id:
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/audit'
     | '/_authenticated/admin/content'
     | '/_authenticated/admin/users'
+    | '/api/public/health'
     | '/api/tutor/chat-stream'
     | '/_authenticated/admin/'
   fileRoutesById: FileRoutesById
@@ -159,6 +171,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SSlugRoute: typeof SSlugRoute
+  ApiPublicHealthRoute: typeof ApiPublicHealthRoute
   ApiTutorChatStreamRoute: typeof ApiTutorChatStreamRoute
 }
 
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTutorChatStreamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/health': {
+      id: '/api/public/health'
+      path: '/api/public/health'
+      fullPath: '/api/public/health'
+      preLoaderRoute: typeof ApiPublicHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
       path: '/users'
@@ -278,6 +298,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SSlugRoute: SSlugRoute,
+  ApiPublicHealthRoute: ApiPublicHealthRoute,
   ApiTutorChatStreamRoute: ApiTutorChatStreamRoute,
 }
 export const routeTree = rootRouteImport
