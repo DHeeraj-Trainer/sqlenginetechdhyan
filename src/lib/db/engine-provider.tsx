@@ -152,7 +152,8 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         };
       }
     },
-    [refreshTables],
+    [refreshCatalog],
+
   );
 
   const value = useMemo<EngineContextValue>(
