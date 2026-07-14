@@ -453,34 +453,38 @@ function TopBar({
   onShare: () => void | Promise<void>;
 }) {
   return (
-    <header className="flex h-11 shrink-0 items-center gap-2 border-b bg-muted/30 px-3">
-      <div className="flex items-center gap-2 font-semibold">
+    <header className="flex h-11 shrink-0 items-center gap-2 border-b bg-muted/30 px-2 sm:px-3">
+      <div className="flex shrink-0 items-center gap-2 font-semibold">
         <Database className="h-4 w-4 text-primary" />
         <span className="hidden sm:inline">SQL Workbench</span>
       </div>
-      <div className="mx-2 h-4 w-px bg-border" />
-      <EngineSwitcher engineId={engineId} onSwitch={onSwitchEngine} />
-      <div className="ml-auto flex items-center gap-1">
-        <Button size="sm" variant="ghost" className="h-8" onClick={onFormat}>
+      <div className="mx-1 hidden h-4 w-px shrink-0 bg-border sm:block" />
+      <div className="shrink-0">
+        <EngineSwitcher engineId={engineId} onSwitch={onSwitchEngine} />
+      </div>
+      <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 overflow-x-auto no-scrollbar">
+        <Button size="sm" variant="ghost" className="h-8 shrink-0" onClick={onFormat}>
           Format
         </Button>
-        <Button size="sm" variant="ghost" className="h-8" onClick={onImport}>
-          <Upload className="mr-1 h-3.5 w-3.5" /> Import SQL
+        <Button size="sm" variant="ghost" className="h-8 shrink-0" onClick={onImport} aria-label="Import SQL">
+          <Upload className="h-3.5 w-3.5 sm:mr-1" />
+          <span className="hidden sm:inline">Import SQL</span>
         </Button>
-        <Button size="sm" variant="ghost" className="h-8" onClick={onExport}>
+        <Button size="sm" variant="ghost" className="h-8 shrink-0" onClick={onExport}>
           Export
         </Button>
-        <Button size="sm" variant="ghost" className="h-8" onClick={() => void onShare()} aria-label="Share query">
+        <Button size="sm" variant="ghost" className="h-8 shrink-0" onClick={() => void onShare()} aria-label="Share query">
           Share
         </Button>
-        <Button size="sm" variant="ghost" className="h-8" onClick={onToggleTheme} aria-label="Toggle theme">
+        <Button size="sm" variant="ghost" className="h-8 shrink-0" onClick={onToggleTheme} aria-label="Toggle theme">
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
-        <Button size="sm" onClick={onOpenTutor}>
-          <Sparkles className="mr-1 h-3.5 w-3.5" /> AI Tutor
+        <Button size="sm" className="h-8 shrink-0" onClick={onOpenTutor}>
+          <Sparkles className="h-3.5 w-3.5 sm:mr-1" />
+          <span className="hidden sm:inline">AI Tutor</span>
         </Button>
-        <div className="mx-1 h-4 w-px bg-border" />
-        <UserMenu />
+        <div className="mx-1 h-4 w-px shrink-0 bg-border" />
+        <div className="shrink-0"><UserMenu /></div>
       </div>
     </header>
   );
