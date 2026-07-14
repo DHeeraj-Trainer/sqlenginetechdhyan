@@ -45,18 +45,30 @@ export function EngineProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [tables, setTables] = useState<TableInfo[]>([]);
+  const [catalog, setCatalog] = useState<CatalogSnapshot>(() => emptyCatalog("sqlite"));
   const [currentSampleId, setCurrentSampleId] = useState<string>(sampleDatabases[0].id);
   const engineRef = useRef<SqlEngine | null>(null);
 
-  const refreshTables = useCallback(async () => {
+  const refreshCatalog = useCallback(async () => {
     if (!engineRef.current) return;
     try {
-      const t = await engineRef.current.listTables();
-      setTables(t);
+      const snap = await loadCatalog(engineRef.current);
+      setCatalog(snap);
+      // Keep the flat tables list in sync for legacy consumers.
+      const flat: TableInfo[] = [];
+      for (const s of snap.schemas) {
+        for (const t of [...s.tables, ...s.views, ...s.materializedViews]) {
+          flat.push({ name: t.name, kind: t.kind === "view" ? "view" : "table", columns: t.columns });
+        }
+      }
+      setTables(flat);
     } catch (e) {
-      console.error("listTables failed", e);
+      console.error("refreshCatalog failed", e);
     }
   }, []);
+
+  const refreshTables = refreshCatalog;
+
 
   const loadSample = useCallback(
     async (sampleId: string) => {
