@@ -41,32 +41,84 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  // Show full failing-route diagnostics in dev; keep prod UX friendly.
+  const isDev = import.meta.env.DEV;
+  const route =
+    typeof window !== "undefined" ? window.location.pathname + window.location.search : "";
+  const stack = error?.stack ?? "";
+  // Best-effort: pull the top user-code frame out of the stack for a quick
+  // "failing code" locator. Filters vendor / node_modules / router internals.
+  const topAppFrame =
+    stack
+      .split("\n")
+      .map((l) => l.trim())
+      .find(
+        (l) =>
+          l.startsWith("at ") &&
+          !/node_modules|@tanstack|react-dom|\/vendor\//.test(l) &&
+          /\/src\//.test(l),
+      ) ?? "";
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
-          </a>
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-2xl">
+        <div className="text-center">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            This page didn't load
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {error?.name ? `${error.name}: ` : ""}
+            {error?.message || "Something went wrong on our end."}
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => {
+                router.invalidate();
+                reset();
+              }}
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Try again
+            </button>
+            <a
+              href="/"
+              className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Go home
+            </a>
+          </div>
         </div>
+
+        {isDev && (
+          <details
+            open
+            className="mt-8 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-left"
+          >
+            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-destructive">
+              Dev diagnostics
+            </summary>
+            <dl className="mt-3 space-y-2 text-xs text-foreground">
+              <div>
+                <dt className="font-medium text-muted-foreground">Route</dt>
+                <dd className="font-mono">{route || "(unknown)"}</dd>
+              </div>
+              {topAppFrame && (
+                <div>
+                  <dt className="font-medium text-muted-foreground">Failing code (top app frame)</dt>
+                  <dd className="font-mono break-all">{topAppFrame}</dd>
+                </div>
+              )}
+              <div>
+                <dt className="font-medium text-muted-foreground">Stack trace</dt>
+                <dd>
+                  <pre className="mt-1 max-h-80 overflow-auto rounded bg-background/60 p-2 font-mono text-[11px] leading-relaxed text-foreground whitespace-pre-wrap">
+                    {stack || "(no stack available)"}
+                  </pre>
+                </dd>
+              </div>
+            </dl>
+          </details>
+        )}
       </div>
     </div>
   );
