@@ -17,11 +17,11 @@ export const Route = createFileRoute("/")({
         content:
           "A browser-based SQL IDE with Monaco editor, SQLite (sql.js) and Postgres (PGlite), a schema explorer, data grid, and a streaming AI SQL tutor.",
       },
-      { property: "og:title", content: "SQL Workbench — Interactive SQL IDE" },
+      { property: "og:title", content: "SQL Workbench — Interactive SQL IDE with AI Tutor" },
       {
         property: "og:description",
         content:
-          "Write, run and learn SQL in the browser with real WASM engines, a full schema explorer, and an AI tutor.",
+          "A browser-based SQL IDE with Monaco editor, SQLite (sql.js) and Postgres (PGlite), a schema explorer, data grid, and a streaming AI SQL tutor.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

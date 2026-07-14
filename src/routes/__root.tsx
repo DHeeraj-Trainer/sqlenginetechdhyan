@@ -77,24 +77,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SQL Online Training Portal" },
+      { title: "SQL Workbench — Interactive SQL IDE with AI Tutor" },
       {
         name: "description",
         content:
-          "Interactive SQL bootcamp with an in-browser sandbox, 10 real-world domains, and an AI tutor.",
+          "A browser-based SQL IDE with Monaco editor, SQLite (sql.js) and Postgres (PGlite), a schema explorer, data grid, and a streaming AI SQL tutor.",
       },
-      { property: "og:title", content: "SQL Online Training Portal" },
+      { property: "og:title", content: "SQL Workbench — Interactive SQL IDE with AI Tutor" },
       {
         property: "og:description",
         content:
-          "Learn SQL hands-on with an interactive sandbox, guided challenges, quizzes, and an AI tutor.",
+          "A browser-based SQL IDE with Monaco editor, SQLite (sql.js) and Postgres (PGlite), a schema explorer, data grid, and a streaming AI SQL tutor.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "SQL Workbench — Interactive SQL IDE with AI Tutor" },
+      { name: "twitter:description", content: "A browser-based SQL IDE with Monaco editor, SQLite (sql.js) and Postgres (PGlite), a schema explorer, data grid, and a streaming AI SQL tutor." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/3e20657f-81bb-41b5-85cf-e5266bfab708" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/3e20657f-81bb-41b5-85cf-e5266bfab708" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
