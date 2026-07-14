@@ -41,8 +41,8 @@ export function LearnPanel({ onOpenInEditor }: Props) {
         </div>
 
         <TabsContent value="domains" className="m-0 flex-1 overflow-hidden">
-          <div className="flex h-full min-h-0 flex-col md:grid md:grid-cols-[220px_1fr]">
-            <ul className="max-h-40 shrink-0 overflow-y-auto border-b text-xs md:max-h-none md:border-b-0 md:border-r">
+          <div className="flex h-full min-h-0 flex-col">
+            <ul className="max-h-40 shrink-0 overflow-y-auto border-b text-xs">
               {domains.map((d) => (
                 <li key={d.id}>
                   <button
@@ -56,15 +56,15 @@ export function LearnPanel({ onOpenInEditor }: Props) {
                 </li>
               ))}
             </ul>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm sm:p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm">
               {domain && <DomainDetail domain={domain} onOpenInEditor={onOpenInEditor} />}
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="docs" className="m-0 flex-1 overflow-hidden">
-          <div className="flex h-full min-h-0 flex-col md:grid md:grid-cols-[240px_1fr]">
-            <ul className="max-h-40 shrink-0 overflow-y-auto border-b text-xs md:max-h-none md:border-b-0 md:border-r">
+          <div className="flex h-full min-h-0 flex-col">
+            <ul className="max-h-40 shrink-0 overflow-y-auto border-b text-xs">
               {chapters.map((c) => (
                 <li key={c.id}>
                   <button
@@ -78,7 +78,7 @@ export function LearnPanel({ onOpenInEditor }: Props) {
                 </li>
               ))}
             </ul>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm sm:p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm">
               {chapter && (
                 <article className="prose prose-sm max-w-none dark:prose-invert">
                   <h2>{chapter.title}</h2>
@@ -215,14 +215,19 @@ function DomainDetail({
 
       <section>
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Challenges ({domain.questions.length}) — solve without peeking
+          Challenges ({domain.questions.length}) — write, verify, and move on
         </h3>
         <ul className="space-y-2">
-          {domain.questions.map((q) => (
-            <ChallengeCard
+          {domain.questions.map((q, i) => (
+            <BeginnerCard
               key={q.id}
               q={q}
-              onStart={() => startChallenge(q)}
+              index={i}
+              domainLoaded={loadedId === domain.id}
+              ensureLoaded={loadDomain}
+              onOpenInEditor={() => startChallenge(q)}
+              nextId={domain.questions[i + 1]?.id ?? null}
+              isFinal={i === domain.questions.length - 1}
             />
           ))}
         </ul>
@@ -582,28 +587,143 @@ function AdvancedCard({
   );
 }
 
-function ChallengeCard({
+function BeginnerCard({
   q,
-  onStart,
+  index,
+  domainLoaded,
+  ensureLoaded,
+  onOpenInEditor,
+  nextId,
+  isFinal,
 }: {
   q: { id: string; text: string; category: string; difficulty: string; expectedQuery: string };
-  onStart: () => void;
+  index: number;
+  domainLoaded: boolean;
+  ensureLoaded: () => Promise<boolean>;
+  onOpenInEditor: () => void;
+  nextId: string | null;
+  isFinal: boolean;
 }) {
+  const { runQuery } = useEngine();
+  const [sql, setSql] = useState("");
   const [showSolution, setShowSolution] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [solved, setSolved] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [feedback, setFeedback] = useState<
+    | { kind: "ok"; msg: string }
+    | { kind: "err"; msg: string; detail?: string }
+    | null
+  >(null);
+
+  const goNext = () => {
+    if (!nextId) return;
+    const el = document.getElementById(`beg-card-${nextId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-primary");
+      setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 1600);
+    }
+  };
+
+  const verify = async () => {
+    if (!sql.trim()) {
+      setFeedback({ kind: "err", msg: "Write some SQL first." });
+      return;
+    }
+    setBusy(true);
+    setFeedback(null);
+    try {
+      if (!domainLoaded) {
+        const ok = await ensureLoaded();
+        if (!ok) {
+          setFeedback({ kind: "err", msg: "Domain failed to load into the engine." });
+          return;
+        }
+      }
+      const [mine, ref] = await Promise.all([runQuery(sql), runQuery(q.expectedQuery)]);
+      if (mine.error) {
+        setAttempts((a) => a + 1);
+        setFeedback({ kind: "err", msg: "Your SQL errored.", detail: mine.error });
+        return;
+      }
+      if (ref.error || !ref.results?.length) {
+        setFeedback({
+          kind: "err",
+          msg: "Reference query failed — reload the domain.",
+          detail: ref.error ?? "",
+        });
+        return;
+      }
+      const mineLast = mine.results?.[mine.results.length - 1];
+      const refLast = ref.results[ref.results.length - 1];
+      if (!mineLast) {
+        setAttempts((a) => a + 1);
+        setFeedback({ kind: "err", msg: "Your query returned no result set." });
+        return;
+      }
+      const okRows = normalizeRows(mineLast.rows) === normalizeRows(refLast.rows);
+      const okCols =
+        mineLast.columns.length === refLast.columns.length &&
+        mineLast.rows.length === refLast.rows.length;
+      if (okRows && okCols) {
+        setSolved(true);
+        setFeedback({
+          kind: "ok",
+          msg: `Correct! ${mineLast.rows.length} row(s), ${mine.durationMs.toFixed(0)}ms.`,
+        });
+        toast.success(`Challenge ${q.id} solved`);
+      } else {
+        setAttempts((a) => a + 1);
+        setFeedback({
+          kind: "err",
+          msg: "Result doesn't match the reference.",
+          detail: `Expected ${refLast.rows.length} row(s) × ${refLast.columns.length} col(s); got ${mineLast.rows.length} × ${mineLast.columns.length}.`,
+        });
+      }
+    } catch (e) {
+      setAttempts((a) => a + 1);
+      setFeedback({ kind: "err", msg: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <li className="rounded border p-3">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {q.id} · {q.category} · {q.difficulty}
-          </div>
-          <p className="mt-1 break-words text-sm">{q.text}</p>
-        </div>
-        <Button size="sm" onClick={onStart} className="shrink-0">
-          Attempt
-        </Button>
+    <li
+      id={`beg-card-${q.id}`}
+      className={`rounded border p-3 transition-shadow ${
+        solved ? "border-emerald-500/60 bg-emerald-500/5" : ""
+      }`}
+    >
+      <div className="flex items-start gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {solved ? (
+          <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+        ) : (
+          <Play className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
+        )}
+        <span className="min-w-0 break-words">
+          #{index + 1} · {q.id} · {q.category} · {q.difficulty}
+        </span>
       </div>
-      <div className="mt-2 flex justify-end">
+      <p className="mt-1 break-words text-sm">{q.text}</p>
+
+      <textarea
+        value={sql}
+        onChange={(e) => setSql(e.target.value)}
+        spellCheck={false}
+        placeholder="-- Write your SQL, then click Verify"
+        className="mt-2 h-24 w-full resize-y rounded border bg-background p-2 font-mono text-[12px]"
+      />
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={verify} disabled={busy}>
+          {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+          Verify
+        </Button>
+        <Button size="sm" variant="outline" onClick={onOpenInEditor}>
+          Open in editor
+        </Button>
         <button
           type="button"
           onClick={() => setShowSolution((v) => !v)}
@@ -611,17 +731,52 @@ function ChallengeCard({
           aria-expanded={showSolution}
         >
           {showSolution ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-          {showSolution ? "Hide reference solution" : "Reveal reference solution"}
+          {showSolution ? "Hide reference" : "Reveal reference"}
         </button>
+        {attempts > 0 && (
+          <span className="ml-auto text-[11px] text-muted-foreground">Attempts: {attempts}</span>
+        )}
       </div>
+
+      {feedback && (
+        <div
+          className={`mt-2 rounded border p-2 text-xs ${
+            feedback.kind === "ok"
+              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              : "border-destructive/60 bg-destructive/10 text-destructive"
+          }`}
+        >
+          <div className="font-semibold">{feedback.msg}</div>
+          {"detail" in feedback && feedback.detail ? (
+            <pre className="mt-1 whitespace-pre-wrap break-words text-[11px]">
+              {feedback.detail}
+            </pre>
+          ) : null}
+        </div>
+      )}
+
       {showSolution && (
-        <pre className="mt-2 overflow-x-auto rounded bg-slate-950 p-2 text-[11px] leading-relaxed text-slate-100">
+        <pre className="mt-2 overflow-x-auto rounded bg-slate-950 p-2 text-[11px] leading-relaxed text-slate-100 select-text">
           <code>{q.expectedQuery}</code>
         </pre>
+      )}
+
+      {solved && !isFinal && nextId && (
+        <div className="mt-2 flex justify-end">
+          <Button size="sm" variant="secondary" onClick={goNext} className="w-full sm:w-auto">
+            Next challenge <ArrowRight className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+      {solved && isFinal && (
+        <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+          All beginner challenges solved. Try the Advanced track below.
+        </p>
       )}
     </li>
   );
 }
+
 
 function SyllabusView() {
   return (
