@@ -392,7 +392,7 @@ function WorkbenchInner() {
 
       {/* Mobile drawer sidebar */}
       <Sheet open={isMobile && mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-        <SheetContent side="left" className="w-[min(88vw,340px)] p-0">
+        <SheetContent side="left" className="w-[min(96vw,420px)] p-0">
           <SheetHeader className="border-b px-4 py-3">
             <SheetTitle className="text-sm">{SIDEBAR_LABEL[sidebar]}</SheetTitle>
           </SheetHeader>
