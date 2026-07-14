@@ -41,8 +41,8 @@ export function LearnPanel({ onOpenInEditor }: Props) {
         </div>
 
         <TabsContent value="domains" className="m-0 flex-1 overflow-hidden">
-          <div className="grid h-full grid-cols-[220px_1fr]">
-            <ul className="overflow-y-auto border-r text-xs">
+          <div className="flex h-full min-h-0 flex-col md:grid md:grid-cols-[220px_1fr]">
+            <ul className="max-h-40 shrink-0 overflow-y-auto border-b text-xs md:max-h-none md:border-b-0 md:border-r">
               {domains.map((d) => (
                 <li key={d.id}>
                   <button
@@ -56,15 +56,15 @@ export function LearnPanel({ onOpenInEditor }: Props) {
                 </li>
               ))}
             </ul>
-            <div className="overflow-y-auto p-4 text-sm">
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm sm:p-4">
               {domain && <DomainDetail domain={domain} onOpenInEditor={onOpenInEditor} />}
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="docs" className="m-0 flex-1 overflow-hidden">
-          <div className="grid h-full grid-cols-[240px_1fr]">
-            <ul className="overflow-y-auto border-r text-xs">
+          <div className="flex h-full min-h-0 flex-col md:grid md:grid-cols-[240px_1fr]">
+            <ul className="max-h-40 shrink-0 overflow-y-auto border-b text-xs md:max-h-none md:border-b-0 md:border-r">
               {chapters.map((c) => (
                 <li key={c.id}>
                   <button
@@ -78,7 +78,7 @@ export function LearnPanel({ onOpenInEditor }: Props) {
                 </li>
               ))}
             </ul>
-            <div className="overflow-y-auto p-4 text-sm">
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 text-sm sm:p-4">
               {chapter && (
                 <article className="prose prose-sm max-w-none dark:prose-invert">
                   <h2>{chapter.title}</h2>
@@ -562,12 +562,12 @@ function AdvancedCard({
       )}
 
       {solved && (
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-emerald-700 dark:text-emerald-300">
+        <div className="mt-2 flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <p className="min-w-0 text-xs text-emerald-700 dark:text-emerald-300">
             Solved. {isFinal ? "You finished the advanced track!" : "Next challenge unlocked."}
           </p>
           {!isFinal && nextId && (
-            <Button size="sm" variant="secondary" onClick={goNext}>
+            <Button size="sm" variant="secondary" onClick={goNext} className="w-full sm:w-auto">
               Next tough challenge <ArrowRight className="ml-1 h-3.5 w-3.5" />
             </Button>
           )}

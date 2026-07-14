@@ -18,6 +18,14 @@ body {
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
+/* Utility: hide scrollbar visuals while keeping scroll behavior (used by the
+   mobile top-bar action cluster so its internal horizontal scroll is silent). */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar { display: none; width: 0; height: 0; }
+}
+
 /* Hide the Lovable badge widget on every page and dynamically loaded view.
    Covers the container, all descendants, and any orphaned close buttons. */
 #lovable-badge,
