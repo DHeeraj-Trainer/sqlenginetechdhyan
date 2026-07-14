@@ -105,9 +105,9 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         const sample = sampleDatabases.find((s) => s.id === currentSampleId) ?? sampleDatabases[0];
         await inst.loadScript(buildScript(sample, inst.id));
         setCurrentSampleId(sample.id);
-        const t = await inst.listTables();
-        setTables(t);
+        await refreshCatalog();
         setStatus("ready");
+
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setStatus("error");
