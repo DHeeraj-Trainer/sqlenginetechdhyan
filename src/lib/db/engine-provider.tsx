@@ -113,7 +113,8 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         setStatus("error");
       }
     },
-    [currentSampleId],
+    [currentSampleId, refreshCatalog],
+
   );
 
   useEffect(() => {
