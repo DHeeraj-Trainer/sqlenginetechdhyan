@@ -132,6 +132,7 @@ function splitStatements(sql: string): string[] {
   let cur = "";
   let inSingle = false;
   let inDouble = false;
+  let beginDepth = 0;
   for (let i = 0; i < sql.length; i++) {
     const ch = sql[i];
     const next = sql[i + 1];
