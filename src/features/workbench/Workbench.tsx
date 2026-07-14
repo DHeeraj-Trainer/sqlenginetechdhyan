@@ -122,7 +122,15 @@ function WorkbenchInner() {
     } else {
       setResults(res.results);
       setRunError(null);
-      setActiveResultIdx(0);
+      // Auto-focus the most useful tab: the last statement that returned rows
+      // (typical for multi-statement scripts ending in a SELECT); otherwise
+      // the last tab so the user sees the final effect.
+      const rs = res.results ?? [];
+      let idx = rs.length ? rs.length - 1 : 0;
+      for (let i = rs.length - 1; i >= 0; i--) {
+        if (rs[i].rows && rs[i].rows.length > 0) { idx = i; break; }
+      }
+      setActiveResultIdx(idx);
       pushHistory({ sql, engine: engineId, ok: true, durationMs: res.durationMs });
       toast.success(`Ran in ${res.durationMs.toFixed(0)} ms`);
     }
