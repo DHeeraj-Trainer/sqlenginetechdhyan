@@ -137,10 +137,11 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       try {
         const results = await inst.exec(sql);
         const durationMs = performance.now() - start;
-        // Refresh schema if statement likely mutated it.
-        if (/\b(create|drop|alter|insert|update|delete|truncate)\b/i.test(sql)) {
-          void refreshTables();
+        // Refresh catalog if statement mutated schema or data.
+        if (isSchemaChanging(sql) || isDataChanging(sql)) {
+          void refreshCatalog();
         }
+
         return { results, error: null, durationMs };
       } catch (e) {
         const durationMs = performance.now() - start;
