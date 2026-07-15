@@ -245,6 +245,14 @@ export function TablesExplorer({ onInsertQuery, onSendToConsole }: Props) {
             onInsertQuery(sql);
             closeModal();
           }}
+          onSendToConsole={
+            onSendToConsole
+              ? (sql) => {
+                  onSendToConsole(sql);
+                  closeModal();
+                }
+              : undefined
+          }
         />
       )}
       {modal?.kind === "er" && (
