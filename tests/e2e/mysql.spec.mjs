@@ -572,6 +572,116 @@ async function main() {
     rows: [[1], [3]],
   });
 
+  // --- 6c. LIKE / NOT LIKE + backslash escape of % and _ ------------------
+  // Seed a small pattern table with strings that contain literal %, _, and \.
+  const likeSeed = await run(`
+    DROP TABLE IF EXISTS \`labels\`;
+    CREATE TABLE \`labels\` (
+      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+      \`name\` VARCHAR(64) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    INSERT INTO \`labels\` (\`name\`) VALUES
+      ('alpha'),
+      ('alphabet'),
+      ('beta'),
+      ('50%_off'),
+      ('100% new'),
+      ('under_score'),
+      ('a_b'),
+      ('back\\\\slash');
+  `);
+  if (likeSeed.error) fail(`labels seed failed: ${likeSeed.error}`);
+  else ok("seed: labels created for LIKE tests");
+
+  // Simple prefix LIKE — % matches "anything after".
+  const likePrefixRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE 'alpha%' ORDER BY `name`;",
+  );
+  assertResult("LIKE 'alpha%' matches prefix", likePrefixRes, {
+    columns: ["name"],
+    rows: [["alpha"], ["alphabet"]],
+  });
+
+  // Single-char wildcard _ — must match exactly one char.
+  const likeUnderscoreRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE 'a_b' ORDER BY `name`;",
+  );
+  assertResult("LIKE 'a_b' matches exactly one char between a and b", likeUnderscoreRes, {
+    columns: ["name"],
+    rows: [["a_b"]],
+  });
+
+  // NOT LIKE — complement of the prefix match.
+  const notLikeRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` NOT LIKE 'alpha%' AND `name` NOT LIKE '%\\\\%' ESCAPE '\\\\' ORDER BY `name`;",
+  );
+  // Note: intentionally excludes the row containing a real backslash so the
+  // result set is deterministic across pattern-escape implementations.
+  assertResult("NOT LIKE 'alpha%' excludes prefix matches", notLikeRes, {
+    columns: ["name"],
+    rows: [
+      [["100% new"]],
+      [["50%_off"]],
+      [["a_b"]],
+      [["beta"]],
+      [["under_score"]],
+    ].flat(),
+  });
+
+  // Escape a literal % using ESCAPE '\' — should match rows whose name
+  // actually contains the '%' character (not act as a wildcard).
+  const escPercentRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%\\\\%%' ESCAPE '\\\\' ORDER BY `name`;",
+  );
+  assertResult("LIKE with ESCAPE '\\\\' matches literal '%'", escPercentRes, {
+    columns: ["name"],
+    rows: [["100% new"], ["50%_off"]],
+  });
+
+  // Escape a literal _ using ESCAPE '\' — matches rows whose name
+  // actually contains the '_' character.
+  const escUnderscoreRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%\\\\_%' ESCAPE '\\\\' ORDER BY `name`;",
+  );
+  assertResult("LIKE with ESCAPE '\\\\' matches literal '_'", escUnderscoreRes, {
+    columns: ["name"],
+    rows: [["50%_off"], ["a_b"], ["under_score"]],
+  });
+
+  // Combined: literal '%_' sequence — must escape both.
+  const escBothRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%\\\\%\\\\_%' ESCAPE '\\\\' ORDER BY `name`;",
+  );
+  assertResult("LIKE with escaped '%_' matches literal '%_' substring", escBothRes, {
+    columns: ["name"],
+    rows: [["50%_off"]],
+  });
+
+  // Row count sanity — total row count in labels table (verifies seed + LIKE
+  // filter row counts add up consistently).
+  const totalRes = await run("SELECT COUNT(*) AS n FROM `labels`;");
+  assertResult("labels table has 8 seeded rows", totalRes, {
+    columns: ["n"],
+    rows: [[8]],
+  });
+
+  // UI render check — LIKE result rendered by ResultsGrid.
+  await page.evaluate(async () => {
+    await window.__wb.runAndRender(
+      "SELECT `name` FROM `labels` WHERE `name` LIKE 'alpha%' ORDER BY `name`;",
+    );
+  });
+  const alphaCell = await page
+    .locator('[role="gridcell"] >> text=alphabet')
+    .first()
+    .isVisible()
+    .catch(() => false);
+  if (alphaCell) ok("ResultsGrid renders LIKE match ('alphabet' cell visible)");
+  else fail("ResultsGrid did not render LIKE match — 'alphabet' cell not visible");
+
+
+
+
 
 
   // --- 7. GROUP BY + HAVING + aggregates ----------------------------------
