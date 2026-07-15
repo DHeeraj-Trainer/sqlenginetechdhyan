@@ -59,7 +59,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { ShareDialog } from "@/features/workbench/ShareDialog";
 
 
-type SidebarSection = "database" | "tables" | "history" | "snippets" | "learn";
+type SidebarSection = "database" | "tables" | "history" | "snippets" | "learn" | "compat";
 
 const SIDEBAR_LABEL: Record<SidebarSection, string> = {
   database: "Database explorer",
@@ -67,6 +67,7 @@ const SIDEBAR_LABEL: Record<SidebarSection, string> = {
   history: "Query history",
   snippets: "Saved snippets",
   learn: "Learn",
+  compat: "MySQL compatibility",
 };
 
 export function Workbench() {
