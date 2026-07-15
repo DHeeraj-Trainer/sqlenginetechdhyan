@@ -53,6 +53,7 @@ import { useAuth, signOut } from "@/hooks/use-auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ShareDialog } from "@/features/workbench/ShareDialog";
 
 
 type SidebarSection = "database" | "history" | "snippets" | "learn";
