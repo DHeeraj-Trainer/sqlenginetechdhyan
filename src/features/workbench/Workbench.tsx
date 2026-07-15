@@ -627,6 +627,7 @@ function SidebarRail({
 }) {
   const items: { id: SidebarSection; label: string; icon: React.ReactNode }[] = [
     { id: "database", label: "Database", icon: <Database className="h-4 w-4" /> },
+    { id: "tables", label: "Tables", icon: <Layers className="h-4 w-4" /> },
     { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
     { id: "snippets", label: "Snippets", icon: <Bookmark className="h-4 w-4" /> },
     { id: "learn", label: "Learn", icon: <GraduationCap className="h-4 w-4" /> },
