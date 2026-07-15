@@ -106,12 +106,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       setStatus("loading");
       setError(null);
       try {
-        if (id === "mysql") {
-          throw new Error(
-            "MySQL requires a server connection. Add a MySQL connection secret to enable this engine.",
-          );
-        }
-        const factory = engineFactories[id as Exclude<EngineId, "mysql">];
+        const factory = engineFactories[id];
         const inst = factory();
         await inst.init();
         engineRef.current = inst;
