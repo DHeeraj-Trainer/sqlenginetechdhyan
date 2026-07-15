@@ -149,11 +149,41 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
     }
   };
 
+  const confirmRevoke = async () => {
+    const row = confirmRow;
+    if (!row) return;
+    setConfirmRow(null);
+    await revoke(row);
+  };
+
   const copy = async (slug: string) => {
     const url = shareUrl(slug);
     await navigator.clipboard.writeText(url).catch(() => {});
     toast.success("Copied", { description: url });
   };
+
+  const visibleShares = useMemo(() => {
+    if (!shares) return null;
+    const now = Date.now();
+    const bucket = (r: ShareRow) => {
+      if (r.revoked) return "revoked";
+      if (r.expires_at && new Date(r.expires_at).getTime() < now) return "expired";
+      if (r.expires_at) {
+        const days = (new Date(r.expires_at).getTime() - now) / 86_400_000;
+        if (days <= 7) return "expiring";
+      }
+      return "active";
+    };
+    const filtered = statusFilter === "all" ? shares : shares.filter((r) => bucket(r) === statusFilter);
+    const expTime = (r: ShareRow) =>
+      r.expires_at ? new Date(r.expires_at).getTime() : Number.POSITIVE_INFINITY;
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortKey === "expires-asc") return expTime(a) - expTime(b);
+      if (sortKey === "expires-desc") return expTime(b) - expTime(a);
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    return sorted;
+  }, [shares, statusFilter, sortKey]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
