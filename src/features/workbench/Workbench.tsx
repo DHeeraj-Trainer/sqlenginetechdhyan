@@ -638,7 +638,7 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         activeConnectionId={activeConnId}
-        onActivate={async (conn) => {
+        onActivate={async (conn: StoredMysqlConnection) => {
           await onSwitch("mysql-live");
           // After the engine switches, wire the connection onto it.
           const inst = (window as unknown as { __wb?: { engine?: unknown } }).__wb?.engine as
