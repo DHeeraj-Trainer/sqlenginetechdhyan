@@ -1,0 +1,22 @@
+import { chromium } from "playwright";
+const browser = await chromium.launch({ headless: true, executablePath: "/chromium_headless_shell-1194/chrome-linux/headless_shell" });
+const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page = await context.newPage();
+await context.addInitScript(() => { window.__wbEnableTestBridge = true; });
+await page.goto("http://localhost:8080", { waitUntil: "domcontentloaded" });
+await page.waitForFunction(() => !!window.__wb);
+await page.evaluate(() => window.__wb.switchEngine("mysql"));
+await page.waitForFunction(() => window.__wb?.status === "ready" && window.__wb.engineId === "mysql", null, { timeout: 60000 });
+const res = await page.evaluate(() => window.__wb.runAndRender("SELCT * FROM foo;"));
+console.log("res.error type:", typeof res.error, "len:", res.error?.length);
+console.log("res.error head:", JSON.stringify(res.error?.slice(0, 60)));
+console.log("has marker:", res.error?.includes("\u0001MYSQL_DIAG\u0001"));
+await page.waitForTimeout(500);
+const bodyText = await page.locator("body").innerText();
+console.log("has Query failed:", bodyText.includes("Query failed"));
+console.log("has Why this failed:", bodyText.includes("Why this failed"));
+console.log("has Suggested:", bodyText.includes("Suggested alternative"));
+// snippet around error
+const idx = bodyText.indexOf("Query failed");
+console.log("snippet:", JSON.stringify(bodyText.slice(idx, idx+400)));
+await browser.close();
