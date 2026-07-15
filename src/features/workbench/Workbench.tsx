@@ -154,8 +154,9 @@ function WorkbenchInner() {
     if (res.error) {
       setResults(null);
       setRunError(res.error);
-      pushHistory({ sql, engine: engineId, ok: false, durationMs: res.durationMs, error: res.error });
-      toast.error("Query failed", { description: res.error.slice(0, 200) });
+      const shortErr = stripDiagnosticMarker(res.error);
+      pushHistory({ sql, engine: engineId, ok: false, durationMs: res.durationMs, error: shortErr });
+      toast.error("Query failed", { description: shortErr.slice(0, 200) });
     } else {
       setResults(res.results);
       setRunError(null);
