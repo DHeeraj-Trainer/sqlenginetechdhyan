@@ -37,11 +37,27 @@ function fileToRouteId(filePath) {
   // src/routes/foo/bar.baz.tsx -> /foo/bar/baz
   // src/routes/_authenticated/admin.users.tsx -> /_authenticated/admin/users
   // src/routes/index.tsx -> /
+  // Bracketed segments like [.mcp] or [.well-known] are TanStack escapes for
+  // literal characters (usually a leading dot). Unwrap the brackets so the
+  // resulting id matches what the router generates: [.mcp]/list-tools -> /.mcp/list-tools
   const rel = relative(ROUTES_DIR, filePath).replace(/\\/g, "/").replace(/\.(tsx?|jsx?)$/, "");
   if (rel === "__root") return null; // root route is implicit
-  const segments = rel.split("/").flatMap((seg) => seg.split("."));
-  // `route.tsx` inside a folder marks the layout for that folder — no extra segment.
-  const cleaned = segments.filter((s) => s !== "index" && s !== "route");
+  // First, replace [xxx] with a placeholder that survives the dot-split, then restore.
+  const escaped = rel.replace(/\[([^\]]+)\]/g, (_, inner) => `\u0000${inner}\u0000`);
+  const segments = escaped.split("/").flatMap((seg) => {
+    // Only split on dots OUTSIDE the placeholder-marked regions.
+    const parts = [];
+    let buf = "";
+    let inEscape = false;
+    for (const ch of seg) {
+      if (ch === "\u0000") { inEscape = !inEscape; continue; }
+      if (ch === "." && !inEscape) { parts.push(buf); buf = ""; }
+      else buf += ch;
+    }
+    parts.push(buf);
+    return parts;
+  });
+  const cleaned = segments.filter((s) => s !== "index" && s !== "route" && s !== "");
   if (cleaned.length === 0) return "/";
   return "/" + cleaned.join("/");
 }
