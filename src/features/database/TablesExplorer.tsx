@@ -1285,6 +1285,9 @@ function SqlPreviewDialog({
           <DialogTitle className="flex items-center gap-2">
             <FileCode2 className="h-4 w-4 text-primary" />
             SQL Preview · {table.name}
+            <Badge variant="outline" className="ml-2 text-[10px] uppercase">
+              {isMysql ? "MySQL" : "ANSI"} dialect
+            </Badge>
           </DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[65vh]">
