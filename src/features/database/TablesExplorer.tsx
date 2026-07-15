@@ -972,7 +972,8 @@ function IndexesDialog({ table, onClose }: { table: EnrichedTable; onClose: () =
 const PAGE_SIZE = 20;
 
 function SampleDataDialog({ table, onClose }: { table: EnrichedTable; onClose: () => void }) {
-  const { runQuery } = useEngine();
+  const { runQuery, engineId } = useEngine();
+  const dialect = dialectFor(engineId);
   const [rows, setRows] = useState<unknown[][]>([]);
   const [cols, setCols] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -984,11 +985,13 @@ function SampleDataDialog({ table, onClose }: { table: EnrichedTable; onClose: (
   const [showFilters, setShowFilters] = useState(false);
   const [rowCount, setRowCount] = useState<number | null>(table.rowCount ?? null);
 
-  const qName = q(table.schema, table.name);
+  const qName = qTable(table.schema, table.name, dialect);
   const sqlPreview = useMemo(() => {
-    const orderBy = sort ? ` ORDER BY "${sort.col}" ${sort.dir.toUpperCase()}` : "";
+    const orderBy = sort
+      ? ` ORDER BY ${quoteIdent(sort.col, dialect)} ${sort.dir.toUpperCase()}`
+      : "";
     return `SELECT * FROM ${qName}${orderBy} LIMIT 500;`;
-  }, [qName, sort]);
+  }, [qName, sort, dialect]);
 
   useEffect(() => {
     let cancelled = false;
