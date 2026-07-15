@@ -200,8 +200,10 @@ async function main() {
   }
 
   // --- 2b. Missing column -------------------------------------------------
+  // Unquoted identifier so SQLite raises "no such column" rather than
+  // treating a double-quoted string as a literal fallback.
   {
-    const sql = "SELECT `does_not_exist` FROM `orders`;";
+    const sql = "SELECT does_not_exist FROM `orders`;";
     const res = await runRaw(sql);
     assertDiagnostic("missing column → diagnostic", res, {
       reasonIncludes: "SQLite couldn't resolve a column name",
