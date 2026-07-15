@@ -34,6 +34,12 @@ interface EngineContextValue {
   refreshTables: () => Promise<void>;
   refreshCatalog: () => Promise<void>;
   runQuery: (sql: string) => Promise<{ results: QueryResult[] | null; error: string | null; durationMs: number }>;
+  /**
+   * If the live-MySQL engine is currently active, attach the given connection
+   * to it and refresh the catalog. Otherwise a no-op. Returns true when
+   * attached.
+   */
+  attachLiveMysqlConnection: (conn: import("@/lib/mysql-live.functions").StoredMysqlConnection) => Promise<boolean>;
 }
 
 
