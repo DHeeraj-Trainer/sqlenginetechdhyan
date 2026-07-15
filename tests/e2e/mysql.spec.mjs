@@ -276,11 +276,19 @@ async function main() {
 
   // --- 8. NULL comparisons -------------------------------------------------
   // `= NULL` is always NULL (i.e. never true) — must return zero rows.
+  // sql.js emits empty `columns` when the result set has no rows, so we can't
+  // reuse assertResult (which is column-strict). Assert emptiness directly.
   const eqNullRes = await run("SELECT `id` FROM `orders` WHERE `note` = NULL;");
-  assertResult("`col = NULL` matches nothing (three-valued logic)", eqNullRes, {
-    columns: ["id"],
-    rows: [],
-  });
+  {
+    const last = eqNullRes.results?.[eqNullRes.results.length - 1];
+    if (eqNullRes.error) fail(`\`col = NULL\` errored: ${eqNullRes.error}`);
+    else if (!last) fail("`col = NULL`: no result");
+    else if (last.rows.length !== 0) {
+      fail(`\`col = NULL\` should match nothing, got rows: ${JSON.stringify(last.rows)}`);
+    } else {
+      ok("`col = NULL` matches nothing (three-valued logic)");
+    }
+  }
 
   const isNullRes = await run("SELECT `id` FROM `orders` WHERE `note` IS NULL ORDER BY `id`;");
   assertResult("IS NULL matches rows with NULL note", isNullRes, {
