@@ -12,6 +12,7 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    plugins: [mcpPlugin()],
     resolve: {
       alias: [
         // alasql references optional React Native / Node build deps we never use in the browser.
