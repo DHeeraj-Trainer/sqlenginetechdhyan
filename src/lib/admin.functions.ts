@@ -335,7 +335,7 @@ function csvCell(v: unknown) {
 export const exportAuditLog = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    auditFiltersSchema.extend({ limit: z.number().int().min(1).max(CSV_MAX_ROWS).default(CSV_MAX_ROWS) }).parse(d ?? {}),
+    auditFiltersBase.extend({ limit: z.number().int().min(1).max(CSV_MAX_ROWS).default(CSV_MAX_ROWS) }).parse(d ?? {}),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
