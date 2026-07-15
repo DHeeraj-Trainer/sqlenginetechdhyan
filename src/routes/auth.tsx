@@ -96,7 +96,12 @@ function GoogleButton({ redirectTo }: { redirectTo?: string }) {
         setBusy(true);
         try {
           if (redirectTo) sessionStorage.setItem("wb.postAuthRedirect", redirectTo);
-          const res = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+          // Return to the caller's intended path (e.g. OAuth consent) after Google sign-in.
+          const returnUrl =
+            redirectTo && redirectTo.startsWith("/")
+              ? window.location.origin + redirectTo
+              : window.location.origin;
+          const res = await lovable.auth.signInWithOAuth("google", { redirect_uri: returnUrl });
           if (res.error) {
             toast.error("Google sign-in failed", { description: res.error.message });
             setBusy(false);
@@ -172,11 +177,15 @@ function SignUpForm({ redirectTo }: { redirectTo?: string }) {
       onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);
+        const emailRedirect =
+          redirectTo && redirectTo.startsWith("/")
+            ? window.location.origin + redirectTo
+            : window.location.origin;
         const { error, data } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: emailRedirect,
             data: { full_name: name },
           },
         });
