@@ -57,10 +57,11 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { ShareDialog } from "@/features/workbench/ShareDialog";
 
 
-type SidebarSection = "database" | "history" | "snippets" | "learn";
+type SidebarSection = "database" | "tables" | "history" | "snippets" | "learn";
 
 const SIDEBAR_LABEL: Record<SidebarSection, string> = {
   database: "Database explorer",
+  tables: "Tables",
   history: "Query history",
   snippets: "Saved snippets",
   learn: "Learn",
