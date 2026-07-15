@@ -67,10 +67,32 @@ type ModalState =
   | { kind: "er"; focus?: string }
   | null;
 
-function q(schema: string, name: string) {
-  const s = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  return schema && schema !== "main" ? `${s(schema)}.${s(name)}` : s(name);
+/**
+ * Engine-specific identifier quoting.
+ * MySQL uses backticks by default; SQLite/Postgres use ANSI double quotes.
+ * (SQL_MODE=ANSI_QUOTES on MySQL also accepts double quotes, but MySQL's
+ * out-of-the-box behavior is backticks — that's what real MySQL clients emit.)
+ */
+type Dialect = "mysql" | "ansi";
+function dialectFor(engineId: string): Dialect {
+  return engineId === "mysql" || engineId === "mysql-live" ? "mysql" : "ansi";
 }
+function quoteIdent(name: string, dialect: Dialect): string {
+  if (dialect === "mysql") return `\`${name.replace(/`/g, "``")}\``;
+  return `"${name.replace(/"/g, '""')}"`;
+}
+function qTable(schema: string, name: string, dialect: Dialect): string {
+  const q = (v: string) => quoteIdent(v, dialect);
+  // MySQL has databases, not schemas: only qualify when a non-default schema is present.
+  // For SQLite the pseudo-schema "main" is elided.
+  if (!schema || schema === "main") return q(name);
+  return `${q(schema)}.${q(name)}`;
+}
+/** @deprecated legacy ANSI helper — retained for non-preview call sites. */
+function q(schema: string, name: string) {
+  return qTable(schema, name, "ansi");
+}
+void q;
 
 function tableDescription(t: EnrichedTable): string {
   const parts: string[] = [];
@@ -292,7 +314,9 @@ function TableCard({
     [allTables, table.name],
   );
 
-  const qName = q(table.schema, table.name);
+  const { engineId } = useEngine();
+  const dialect = dialectFor(engineId);
+  const qName = qTable(table.schema, table.name, dialect);
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm transition-all hover:border-primary/40 hover:shadow-md">
@@ -948,7 +972,8 @@ function IndexesDialog({ table, onClose }: { table: EnrichedTable; onClose: () =
 const PAGE_SIZE = 20;
 
 function SampleDataDialog({ table, onClose }: { table: EnrichedTable; onClose: () => void }) {
-  const { runQuery } = useEngine();
+  const { runQuery, engineId } = useEngine();
+  const dialect = dialectFor(engineId);
   const [rows, setRows] = useState<unknown[][]>([]);
   const [cols, setCols] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -960,11 +985,13 @@ function SampleDataDialog({ table, onClose }: { table: EnrichedTable; onClose: (
   const [showFilters, setShowFilters] = useState(false);
   const [rowCount, setRowCount] = useState<number | null>(table.rowCount ?? null);
 
-  const qName = q(table.schema, table.name);
+  const qName = qTable(table.schema, table.name, dialect);
   const sqlPreview = useMemo(() => {
-    const orderBy = sort ? ` ORDER BY "${sort.col}" ${sort.dir.toUpperCase()}` : "";
+    const orderBy = sort
+      ? ` ORDER BY ${quoteIdent(sort.col, dialect)} ${sort.dir.toUpperCase()}`
+      : "";
     return `SELECT * FROM ${qName}${orderBy} LIMIT 500;`;
-  }, [qName, sort]);
+  }, [qName, sort, dialect]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1203,35 +1230,50 @@ function SqlPreviewDialog({
   onInsert: (sql: string) => void;
   onSendToConsole?: (sql: string) => void;
 }) {
-  const qName = q(table.schema, table.name);
+  const { engineId } = useEngine();
+  const dialect = dialectFor(engineId);
+  const isMysql = dialect === "mysql";
+  const qName = qTable(table.schema, table.name, dialect);
+  const qCol = (name: string) => quoteIdent(name, dialect);
+  const pkCol = table.primaryKey[0];
+  const qPk = pkCol ? qCol(pkCol) : qCol("id");
+  const allCols = table.columns.map((c) => qCol(c.name)).join(", ");
+  const setCols = table.columns
+    .filter((c) => !c.pk)
+    .slice(0, 3)
+    .map((c) => `${qCol(c.name)} = ?`)
+    .join(", ");
+  // MySQL supports both `LIMIT count OFFSET offset` (portable) and the
+  // MySQL-only shorthand `LIMIT offset, count`. Real MySQL clients emit the
+  // shorthand for pagination — we render it here for the MySQL dialects.
+  const paginationSql = isMysql
+    ? `SELECT * FROM ${qName}\nORDER BY ${qPk}\nLIMIT 20, 20;  -- offset, count (MySQL)`
+    : `SELECT * FROM ${qName}\nORDER BY ${qPk}\nLIMIT 20 OFFSET 20;`;
+
   const snippets: { label: string; sql: string }[] = [
     { label: "SELECT *", sql: `SELECT * FROM ${qName} LIMIT 100;` },
     {
       label: "SELECT columns",
-      sql: `SELECT ${table.columns.map((c) => c.name).join(", ")}\nFROM ${qName}\nLIMIT 100;`,
+      sql: `SELECT ${allCols}\nFROM ${qName}\nLIMIT 100;`,
     },
     { label: "COUNT(*)", sql: `SELECT COUNT(*) AS total FROM ${qName};` },
     {
+      label: `Paginated (${isMysql ? "MySQL LIMIT offset, count" : "LIMIT / OFFSET"})`,
+      sql: paginationSql,
+    },
+    {
       label: "INSERT template",
-      sql: `INSERT INTO ${qName} (${table.columns.map((c) => c.name).join(", ")})\nVALUES (${table.columns
+      sql: `INSERT INTO ${qName} (${allCols})\nVALUES (${table.columns
         .map(() => "?")
         .join(", ")});`,
     },
     {
       label: "UPDATE template",
-      sql: `UPDATE ${qName}\nSET ${table.columns
-        .filter((c) => !c.pk)
-        .slice(0, 3)
-        .map((c) => `${c.name} = ?`)
-        .join(", ")}\nWHERE ${
-        table.primaryKey[0] ? `${table.primaryKey[0]} = ?` : "id = ?"
-      };`,
+      sql: `UPDATE ${qName}\nSET ${setCols}\nWHERE ${qPk} = ?;`,
     },
     {
       label: "DELETE template",
-      sql: `DELETE FROM ${qName} WHERE ${
-        table.primaryKey[0] ? `${table.primaryKey[0]} = ?` : "id = ?"
-      };`,
+      sql: `DELETE FROM ${qName} WHERE ${qPk} = ?;`,
     },
   ];
   if (table.ddl) snippets.push({ label: "DDL", sql: table.ddl });
@@ -1243,6 +1285,9 @@ function SqlPreviewDialog({
           <DialogTitle className="flex items-center gap-2">
             <FileCode2 className="h-4 w-4 text-primary" />
             SQL Preview · {table.name}
+            <Badge variant="outline" className="ml-2 text-[10px] uppercase">
+              {isMysql ? "MySQL" : "ANSI"} dialect
+            </Badge>
           </DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[65vh]">
