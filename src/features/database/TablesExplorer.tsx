@@ -24,6 +24,7 @@ import {
   RefreshCcw,
   Search,
   Table2,
+  Terminal,
   X,
   ZoomIn,
 } from "lucide-react";
