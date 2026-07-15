@@ -1386,11 +1386,45 @@ function ERDiagramDialog({
   focusTable?: string;
   onClose: () => void;
 }) {
-  const [nodes, setNodes] = useState<Map<string, ERNode>>(() => computeLayout(tables));
-  const [scale, setScale] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [hoverTable, setHoverTable] = useState<string | null>(focusTable ?? null);
-  const [selectedTable, setSelectedTable] = useState<string | null>(focusTable ?? null);
+  // Persisted layout: node positions, view (scale + pan), and selection survive dialog close/reopen.
+  const [savedPositions, setSavedPositions] = usePersistedState<Record<string, { x: number; y: number }>>(
+    "er.positions.v1",
+    {},
+  );
+  const [savedView, setSavedView] = usePersistedState<{ scale: number; panX: number; panY: number }>(
+    "er.view.v1",
+    { scale: 1, panX: 0, panY: 0 },
+  );
+  const [savedSelected, setSavedSelected] = usePersistedState<string | null>("er.selected.v1", null);
+
+  const baseLayout = useMemo(() => computeLayout(tables), [tables]);
+  const nodes = useMemo(() => {
+    const next = new Map(baseLayout);
+    for (const [name, pos] of Object.entries(savedPositions)) {
+      const n = next.get(name);
+      if (n) next.set(name, { ...n, x: pos.x, y: pos.y });
+    }
+    return next;
+  }, [baseLayout, savedPositions]);
+
+  const scale = savedView.scale;
+  const pan = { x: savedView.panX, y: savedView.panY };
+  const setScale = useCallback(
+    (v: number | ((prev: number) => number)) =>
+      setSavedView((prev) => ({
+        ...prev,
+        scale: typeof v === "function" ? (v as (p: number) => number)(prev.scale) : v,
+      })),
+    [setSavedView],
+  );
+  const setPan = useCallback(
+    (val: { x: number; y: number }) => setSavedView((prev) => ({ ...prev, panX: val.x, panY: val.y })),
+    [setSavedView],
+  );
+
+  const [hoverTable, setHoverTable] = useState<string | null>(focusTable ?? savedSelected);
+  const selectedTable = focusTable ?? savedSelected;
+  const setSelectedTable = setSavedSelected;
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{
     kind: "node" | "pan";
@@ -1402,15 +1436,11 @@ function ERDiagramDialog({
   } | null>(null);
 
   useEffect(() => {
-    setNodes(computeLayout(tables));
-  }, [tables]);
-
-  useEffect(() => {
     if (focusTable) {
-      setSelectedTable(focusTable);
+      setSavedSelected(focusTable);
       setHoverTable(focusTable);
     }
-  }, [focusTable]);
+  }, [focusTable, setSavedSelected]);
 
   const highlighted = useMemo(() => {
     const active = hoverTable || selectedTable;
@@ -1484,12 +1514,11 @@ function ERDiagramDialog({
     const dx = (e.clientX - d.startX) / scale;
     const dy = (e.clientY - d.startY) / scale;
     if (d.kind === "node" && d.id) {
-      setNodes((prev) => {
-        const next = new Map(prev);
-        const n = next.get(d.id!);
-        if (n) next.set(d.id!, { ...n, x: d.origX + dx, y: d.origY + dy });
-        return next;
-      });
+      const id = d.id;
+      setSavedPositions((prev) => ({
+        ...prev,
+        [id]: { x: d.origX + dx, y: d.origY + dy },
+      }));
     } else {
       setPan({ x: d.origX + (e.clientX - d.startX), y: d.origY + (e.clientY - d.startY) });
     }
@@ -1500,9 +1529,8 @@ function ERDiagramDialog({
   };
 
   const fitScreen = () => {
-    setScale(1);
-    setPan({ x: 0, y: 0 });
-    setNodes(computeLayout(tables));
+    setSavedPositions({});
+    setSavedView({ scale: 1, panX: 0, panY: 0 });
   };
 
   return (
