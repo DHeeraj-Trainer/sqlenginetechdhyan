@@ -5,13 +5,19 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 /* Legacy portal visual refinements */
 body {
   font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
 }
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -194,5 +200,132 @@ a[href*="lovable.dev"][target="_blank"] {
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+  }
+}
+
+/* ============================================================================
+ * Premium design system — gradients, shadows, motion, utilities
+ * ==========================================================================*/
+:root {
+  --gradient-primary: linear-gradient(135deg, #0D3B73 0%, #1E5AA8 60%, #E3AB18 100%);
+  --gradient-mesh: radial-gradient(circle at 20% 10%, rgba(13,59,115,0.08), transparent 40%),
+                   radial-gradient(circle at 80% 90%, rgba(227,171,24,0.10), transparent 45%);
+  --gradient-card: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.6));
+  --shadow-xs: 0 1px 2px rgba(15,23,42,0.06);
+  --shadow-sm: 0 2px 4px -1px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+  --shadow-md: 0 4px 12px -2px rgba(15,23,42,0.08), 0 2px 4px -1px rgba(15,23,42,0.04);
+  --shadow-lg: 0 12px 32px -8px rgba(15,23,42,0.14), 0 4px 8px -2px rgba(15,23,42,0.06);
+  --shadow-glow: 0 0 24px -4px color-mix(in oklab, var(--primary) 40%, transparent);
+  --motion-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dark {
+  --gradient-primary: linear-gradient(135deg, #0A2E5C 0%, #1E3A5F 60%, #F5C542 100%);
+  --gradient-mesh: radial-gradient(circle at 20% 10%, rgba(245,197,66,0.10), transparent 40%),
+                   radial-gradient(circle at 80% 90%, rgba(13,59,115,0.30), transparent 50%);
+  --gradient-card: linear-gradient(135deg, rgba(13,59,115,0.35), rgba(10,46,92,0.55));
+  --shadow-glow: 0 0 32px -4px color-mix(in oklab, var(--primary) 55%, transparent);
+}
+
+/* Keyframes */
+@keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes scale-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes slide-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes pulse-ring { 0% { transform: scale(0.95); opacity: 0.6; } 70% { transform: scale(1.5); opacity: 0; } 100% { transform: scale(1.5); opacity: 0; } }
+@keyframes gradient-shift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+/* Animation utilities */
+@utility animate-fade-in { animation: fade-in 400ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+@utility animate-scale-in { animation: scale-in 250ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@utility animate-slide-up { animation: slide-up 500ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+@utility animate-float { animation: float 3s ease-in-out infinite; }
+@utility animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* Interactive utilities */
+@utility hover-lift {
+  transition: transform var(--motion-base), box-shadow var(--motion-base);
+  &:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+}
+@utility hover-glow {
+  transition: box-shadow var(--motion-base);
+  &:hover { box-shadow: var(--shadow-glow); }
+}
+@utility hover-scale {
+  transition: transform var(--motion-fast);
+  &:hover { transform: scale(1.03); }
+}
+
+/* Gradient utilities */
+@utility bg-gradient-primary { background: var(--gradient-primary); }
+@utility bg-gradient-mesh { background-image: var(--gradient-mesh); }
+@utility bg-gradient-card { background: var(--gradient-card); }
+@utility text-gradient {
+  background: var(--gradient-primary);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Skeleton shimmer */
+@utility skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--muted) 60%, transparent) 0%,
+    color-mix(in oklab, var(--muted) 90%, transparent) 50%,
+    color-mix(in oklab, var(--muted) 60%, transparent) 100%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 0.5rem;
+}
+
+/* Glass surface */
+@utility surface-glass {
+  background: color-mix(in oklab, var(--card) 70%, transparent);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+}
+
+/* Elevated card */
+@utility surface-elevated {
+  background: var(--gradient-card);
+  border: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+  box-shadow: var(--shadow-md);
+  border-radius: 1rem;
+}
+
+/* Story link (animated underline) */
+@utility story-link {
+  position: relative;
+  display: inline-block;
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    height: 2px;
+    width: 100%;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform var(--motion-base);
+  }
+  &:hover::after { transform: scaleX(1); transform-origin: left; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
