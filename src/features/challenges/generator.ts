@@ -736,7 +736,19 @@ SELECT ROUND(100.0 * (SELECT COUNT(*) FROM w2) / (SELECT COUNT(*) FROM first_eve
   }),
 ];
 
-/** Companies rotate through interview-tier templates. */
+/**
+ * Curated seed templates used for the domain browser (4 per domain).
+ * Chosen to span the beginner → intermediate → advanced arc so every
+ * domain has a self-contained learning slice out of the box.
+ */
+const SEED_TEMPLATE_KEYS = [
+  "list-all",         // SELECT / projection — beginner
+  "count",            // aggregate — beginner→intermediate
+  "group-by",         // GROUP BY — intermediate
+  "top-n-per-group",  // window function — advanced
+];
+
+/** Companies rotate through interview-tier templates (3 per company). */
 const INTERVIEW_TEMPLATE_KEYS = [
   "second-highest",
   "duplicates",
