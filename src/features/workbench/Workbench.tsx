@@ -909,16 +909,81 @@ function EmptyResults({
   );
 }
 
+function stripDiagnosticMarker(msg: string): string {
+  const diag = extractDiagnostic(msg);
+  if (diag) return diag.message || msg.replace(new RegExp(`${MYSQL_DIAG_MARKER}[\\s\\S]*?${MYSQL_DIAG_MARKER}`), "");
+  return msg;
+}
+
 function ErrorPanel({ message, onAskTutor }: { message: string; onAskTutor: () => void }) {
+  const diag: MysqlDiagnostic | null = extractDiagnostic(message);
+  const plain = diag ? diag.message : message;
+
+  const copy = (text: string) => {
+    navigator.clipboard?.writeText(text).then(
+      () => toast.success("Copied to clipboard"),
+      () => toast.error("Copy failed"),
+    );
+  };
+
   return (
-    <div className="flex h-full flex-col items-start gap-3 p-4">
+    <div className="flex h-full flex-col gap-3 overflow-auto p-4">
       <div className="w-full rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
         <div className="mb-1 font-semibold">Query failed</div>
-        <pre className="whitespace-pre-wrap break-words font-mono text-xs">{message}</pre>
+        <pre className="whitespace-pre-wrap break-words font-mono text-xs">{plain}</pre>
       </div>
-      <Button onClick={onAskTutor} size="sm">
-        <Sparkles className="mr-1 h-3.5 w-3.5" /> Ask the AI Tutor
-      </Button>
+
+      {diag && (
+        <>
+          <section className="rounded border bg-muted/40 p-3">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Why this failed (MySQL emulation)
+            </div>
+            <p className="text-sm">{diag.reason}</p>
+          </section>
+
+          <section className="rounded border border-primary/40 bg-primary/5 p-3">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">
+              Suggested alternative
+            </div>
+            <p className="text-sm">{diag.suggestion}</p>
+          </section>
+
+          <section className="rounded border bg-background">
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Translated SQLite query
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => copy(diag.translated)}>
+                Copy
+              </Button>
+            </div>
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-xs">
+              {diag.translated}
+            </pre>
+          </section>
+
+          <section className="rounded border bg-background">
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Your MySQL statement
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => copy(diag.original)}>
+                Copy
+              </Button>
+            </div>
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-xs">
+              {diag.original}
+            </pre>
+          </section>
+        </>
+      )}
+
+      <div>
+        <Button onClick={onAskTutor} size="sm">
+          <Sparkles className="mr-1 h-3.5 w-3.5" /> Ask the AI Tutor
+        </Button>
+      </div>
     </div>
   );
 }
