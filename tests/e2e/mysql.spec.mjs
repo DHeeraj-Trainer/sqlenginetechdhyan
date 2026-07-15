@@ -187,7 +187,198 @@ async function main() {
     else fail(`DESCRIBE missing ${JSON.stringify(missing)}; got columns rows ${JSON.stringify(colNames)}`);
   }
 
-  // --- 6. Result tab wiring — sanity-check the tab bar exists in DOM ------
+  // --- 6. JOINs (INNER + LEFT) --------------------------------------------
+  // Seed a related table so we can exercise cross-table joins with backticks.
+  const joinSeed = await run(`
+    DROP TABLE IF EXISTS \`order_items\`;
+    CREATE TABLE \`order_items\` (
+      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+      \`order_id\` INT NOT NULL,
+      \`sku\` VARCHAR(32) NOT NULL,
+      \`qty\` INT NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    INSERT INTO \`order_items\` (\`order_id\`, \`sku\`, \`qty\`) VALUES
+      (1, 'A', 2),
+      (1, 'B', 1),
+      (3, 'A', 5),
+      (5, 'C', 3);
+  `);
+  if (joinSeed.error) fail(`join seed failed: ${joinSeed.error}`);
+  else ok("seed: order_items created for JOIN tests");
+
+  const innerRes = await run(`
+    SELECT o.\`customer\`, i.\`sku\`, i.\`qty\`
+    FROM \`orders\` o
+    INNER JOIN \`order_items\` i ON i.\`order_id\` = o.\`id\`
+    ORDER BY o.\`id\`, i.\`sku\`;
+  `);
+  assertResult("INNER JOIN orders × order_items", innerRes, {
+    columns: ["customer", "sku", "qty"],
+    rows: [
+      ["alice", "A", 2],
+      ["alice", "B", 1],
+      ["carol", "A", 5],
+      ["erin", "C", 3],
+    ],
+  });
+
+  const leftRes = await run(`
+    SELECT o.\`customer\`, COUNT(i.\`id\`) AS item_count
+    FROM \`orders\` o
+    LEFT JOIN \`order_items\` i ON i.\`order_id\` = o.\`id\`
+    GROUP BY o.\`id\`, o.\`customer\`
+    ORDER BY o.\`id\`;
+  `);
+  assertResult("LEFT JOIN preserves orders with no items", leftRes, {
+    columns: ["customer", "item_count"],
+    rows: [
+      ["alice", 2],
+      ["bob", 0],
+      ["carol", 1],
+      ["dave", 0],
+      ["erin", 1],
+    ],
+  });
+
+  // --- 7. GROUP BY + HAVING + aggregates ----------------------------------
+  const aggRes = await run(`
+    SELECT i.\`sku\`, SUM(i.\`qty\`) AS total_qty, COUNT(*) AS lines
+    FROM \`order_items\` i
+    GROUP BY i.\`sku\`
+    HAVING SUM(i.\`qty\`) >= 3
+    ORDER BY total_qty DESC, i.\`sku\`;
+  `);
+  assertResult("GROUP BY + HAVING SUM() >= 3", aggRes, {
+    columns: ["sku", "total_qty", "lines"],
+    rows: [
+      ["A", 7, 2],
+      ["C", 3, 1],
+    ],
+  });
+
+  // AVG + ROUND on a nullable DECIMAL column — NULLs should be skipped.
+  const avgRes = await run(
+    "SELECT ROUND(AVG(`total`), 2) AS avg_total, COUNT(`total`) AS non_null FROM `orders`;",
+  );
+  assertResult("AVG(total) skips NULLs, COUNT(col) counts non-NULLs", avgRes, {
+    columns: ["avg_total", "non_null"],
+    rows: [[39.94, 4]],
+  });
+
+  // CONCAT() → || translation (MySQL string function).
+  const concatRes = await run(
+    "SELECT CONCAT(`customer`, ':', `id`) AS tag FROM `orders` ORDER BY `id` LIMIT 2;",
+  );
+  assertResult("CONCAT() concatenates via ||", concatRes, {
+    columns: ["tag"],
+    rows: [["alice:1"], ["bob:2"]],
+  });
+
+  // --- 8. NULL comparisons -------------------------------------------------
+  // `= NULL` is always NULL (i.e. never true) — must return zero rows.
+  const eqNullRes = await run("SELECT `id` FROM `orders` WHERE `note` = NULL;");
+  assertResult("`col = NULL` matches nothing (three-valued logic)", eqNullRes, {
+    columns: ["id"],
+    rows: [],
+  });
+
+  const isNullRes = await run("SELECT `id` FROM `orders` WHERE `note` IS NULL ORDER BY `id`;");
+  assertResult("IS NULL matches rows with NULL note", isNullRes, {
+    columns: ["id"],
+    rows: [[2], [4]],
+  });
+
+  const notNullRes = await run(
+    "SELECT `id` FROM `orders` WHERE `note` IS NOT NULL ORDER BY `id`;",
+  );
+  assertResult("IS NOT NULL matches non-NULL notes", notNullRes, {
+    columns: ["id"],
+    rows: [[1], [3], [5]],
+  });
+
+  // COALESCE() with multiple args, including MySQL's IFNULL() which the
+  // translator rewrites to COALESCE().
+  const coalesceRes = await run(
+    "SELECT `id`, COALESCE(`note`, `customer`, 'fallback') AS c FROM `orders` ORDER BY `id`;",
+  );
+  assertResult("COALESCE(note, customer, 'fallback') picks first non-NULL", coalesceRes, {
+    columns: ["id", "c"],
+    rows: [
+      [1, "first"],
+      [2, "bob"],
+      [3, "vip"],
+      [4, "dave"],
+      [5, "promo"],
+    ],
+  });
+
+  // --- 9. Date functions (NOW / CURDATE / DATE(col) / strftime) ------------
+  // Seed a temporal column and hard-code known ISO timestamps so results
+  // are deterministic regardless of when the test runs.
+  const dateSeed = await run(`
+    DROP TABLE IF EXISTS \`events\`;
+    CREATE TABLE \`events\` (
+      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+      \`name\` VARCHAR(32) NOT NULL,
+      \`occurred_at\` DATETIME NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    INSERT INTO \`events\` (\`name\`, \`occurred_at\`) VALUES
+      ('signup',   '2024-01-15 09:30:00'),
+      ('purchase', '2024-01-15 14:05:00'),
+      ('signup',   '2024-02-01 08:00:00'),
+      ('refund',   '2024-02-20 23:59:59');
+  `);
+  if (dateSeed.error) fail(`events seed failed: ${dateSeed.error}`);
+  else ok("seed: events created for date-function tests");
+
+  // DATE(col) truncates a DATETIME to the calendar day. MySQL's DATE() maps
+  // to SQLite's date().
+  const dateColRes = await run(
+    "SELECT `name`, DATE(`occurred_at`) AS day FROM `events` ORDER BY `id`;",
+  );
+  assertResult("DATE(occurred_at) truncates to YYYY-MM-DD", dateColRes, {
+    columns: ["name", "day"],
+    rows: [
+      ["signup", "2024-01-15"],
+      ["purchase", "2024-01-15"],
+      ["signup", "2024-02-01"],
+      ["refund", "2024-02-20"],
+    ],
+  });
+
+  // strftime is portable and used by many MySQL → SQLite migrations as a
+  // stand-in for YEAR() / MONTH(). Group by month:
+  const monthRes = await run(`
+    SELECT strftime('%Y-%m', \`occurred_at\`) AS ym, COUNT(*) AS n
+    FROM \`events\`
+    GROUP BY ym
+    ORDER BY ym;
+  `);
+  assertResult("strftime('%Y-%m', col) groups events by month", monthRes, {
+    columns: ["ym", "n"],
+    rows: [
+      ["2024-01", 2],
+      ["2024-02", 2],
+    ],
+  });
+
+  // NOW() → CURRENT_TIMESTAMP and CURDATE() → DATE('now'). We can't assert
+  // exact values, but we can assert shape: a single row, one column, matching
+  // ISO patterns.
+  const nowRes = await run("SELECT NOW() AS n, CURDATE() AS d;");
+  {
+    const last = nowRes.results?.[nowRes.results.length - 1];
+    const row = last?.rows?.[0];
+    const n = row ? String(row[0]) : "";
+    const d = row ? String(row[1]) : "";
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(n) && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      ok(`NOW() → "${n}", CURDATE() → "${d}" (both ISO-shaped)`);
+    } else {
+      fail(`NOW()/CURDATE() shape unexpected — NOW="${n}" CURDATE="${d}"`);
+    }
+  }
+
+  // --- 10. Result tab wiring — sanity-check the tab bar exists in DOM -----
   // The ResultsHeader always renders once the workbench mounts (tabs list
   // may be empty until the user hits Run in the editor). Bridge queries
   // above go straight through the same QueryResult path that populates the
