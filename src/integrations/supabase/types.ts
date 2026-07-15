@@ -62,6 +62,47 @@ export type Database = {
         }
         Relationships: []
       }
+      challenge_discussions: {
+        Row: {
+          body: string
+          challenge_id: string
+          created_at: string
+          id: string
+          parent_id: string | null
+          updated_at: string
+          upvotes: number
+          user_id: string
+        }
+        Insert: {
+          body: string
+          challenge_id: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          updated_at?: string
+          upvotes?: number
+          user_id: string
+        }
+        Update: {
+          body?: string
+          challenge_id?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          updated_at?: string
+          upvotes?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_discussions_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "challenge_discussions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -134,6 +175,105 @@ export type Database = {
           updated_at?: string
           view_count?: number
           visibility?: string
+        }
+        Relationships: []
+      }
+      user_bookmarks: {
+        Row: {
+          challenge_id: string
+          created_at: string
+          id: string
+          kind: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_notes: {
+        Row: {
+          body: string
+          challenge_id: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body?: string
+          challenge_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          challenge_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_progress: {
+        Row: {
+          attempts: number
+          best_time_ms: number | null
+          challenge_id: string
+          created_at: string
+          hints_used: number
+          id: string
+          last_attempt_at: string | null
+          solved_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          xp_earned: number
+        }
+        Insert: {
+          attempts?: number
+          best_time_ms?: number | null
+          challenge_id: string
+          created_at?: string
+          hints_used?: number
+          id?: string
+          last_attempt_at?: string | null
+          solved_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          xp_earned?: number
+        }
+        Update: {
+          attempts?: number
+          best_time_ms?: number | null
+          challenge_id?: string
+          created_at?: string
+          hints_used?: number
+          id?: string
+          last_attempt_at?: string | null
+          solved_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          xp_earned?: number
         }
         Relationships: []
       }
