@@ -5,6 +5,7 @@ import { SqliteEngine } from "@/lib/db/engines/sqlite";
 import { PostgresEngine } from "@/lib/db/engines/postgres";
 import { AlaSqlEngine } from "@/lib/db/engines/alasql";
 import { MysqlEmulationEngine } from "@/lib/db/engines/mysql";
+import { MysqlLiveEngine } from "@/lib/db/engines/mysql-live";
 import { buildScript } from "@/lib/db/sample-builder";
 import { sampleDatabases } from "@/lib/db/sample-databases";
 import {
@@ -44,6 +45,7 @@ const engineFactories: Record<EngineId, () => SqlEngine> = {
   postgres: () => new PostgresEngine(),
   alasql: () => new AlaSqlEngine(),
   mysql: () => new MysqlEmulationEngine(),
+  "mysql-live": () => new MysqlLiveEngine(),
 };
 
 export function EngineProvider({ children }: { children: ReactNode }) {

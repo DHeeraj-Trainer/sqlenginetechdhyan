@@ -103,6 +103,48 @@ export type Database = {
           },
         ]
       }
+      mysql_connections: {
+        Row: {
+          created_at: string
+          database_name: string
+          host: string
+          id: string
+          label: string
+          password_ciphertext: string
+          port: number
+          updated_at: string
+          use_tls: boolean
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          database_name: string
+          host: string
+          id?: string
+          label: string
+          password_ciphertext: string
+          port?: number
+          updated_at?: string
+          use_tls?: boolean
+          user_id: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          database_name?: string
+          host?: string
+          id?: string
+          label?: string
+          password_ciphertext?: string
+          port?: number
+          updated_at?: string
+          use_tls?: boolean
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
