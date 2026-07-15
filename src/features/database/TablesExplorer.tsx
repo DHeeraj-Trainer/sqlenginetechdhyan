@@ -275,11 +275,13 @@ function TableCard({
   allTables,
   openModal,
   onInsertQuery,
+  onSendToConsole,
 }: {
   table: EnrichedTable;
   allTables: EnrichedTable[];
   openModal: (m: ModalState) => void;
   onInsertQuery: (sql: string) => void;
+  onSendToConsole?: (sql: string) => void;
 }) {
   const inbound = useMemo(
     () =>
