@@ -40,6 +40,7 @@ import { EngineProvider, useEngine } from "@/lib/db/engine-provider";
 import { MonacoSqlEditor } from "@/features/sql-editor/MonacoSqlEditor";
 import { ResultsGrid } from "@/features/database/ResultsGrid";
 import { DatabaseExplorer } from "@/features/database/DatabaseExplorer";
+import { TablesExplorer } from "@/features/database/TablesExplorer";
 import { AiTutorPanel } from "@/features/ai/AiTutorPanel";
 import { LearnPanel } from "@/features/tutorials/LearnPanel";
 import {
@@ -56,10 +57,11 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { ShareDialog } from "@/features/workbench/ShareDialog";
 
 
-type SidebarSection = "database" | "history" | "snippets" | "learn";
+type SidebarSection = "database" | "tables" | "history" | "snippets" | "learn";
 
 const SIDEBAR_LABEL: Record<SidebarSection, string> = {
   database: "Database explorer",
+  tables: "Tables",
   history: "Query history",
   snippets: "Saved snippets",
   learn: "Learn",
@@ -625,6 +627,7 @@ function SidebarRail({
 }) {
   const items: { id: SidebarSection; label: string; icon: React.ReactNode }[] = [
     { id: "database", label: "Database", icon: <Database className="h-4 w-4" /> },
+    { id: "tables", label: "Tables", icon: <Layers className="h-4 w-4" /> },
     { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
     { id: "snippets", label: "Snippets", icon: <Bookmark className="h-4 w-4" /> },
     { id: "learn", label: "Learn", icon: <GraduationCap className="h-4 w-4" /> },
@@ -700,6 +703,7 @@ function SidebarBody({
       className="h-full"
     >
       {section === "database" && <DatabaseExplorer onInsertQuery={onInsert} />}
+      {section === "tables" && <TablesExplorer onInsertQuery={onInsert} />}
       {section === "history" && (
         <HistoryList history={history} onLoad={onLoadNewTab} onClear={onClearHistory} />
       )}
