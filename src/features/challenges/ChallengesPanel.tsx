@@ -12,7 +12,7 @@ import type { Challenge, Difficulty } from "./types";
 import { ChallengeCard } from "./ChallengeCard";
 import { ChallengeDetail } from "./ChallengeDetail";
 import { FiltersBar, DEFAULT_FILTERS, type Filters } from "./FiltersBar";
-import { COMPANIES, COMPANY_MAP } from "./companies";
+import { COMPANIES } from "./companies";
 import { loadState, saveState, toggle, recordSolve, type ChallengeState } from "./storage";
 import { unlockedAchievements, newlyUnlocked, ACHIEVEMENTS } from "./achievements";
 import { computeProgress } from "./progress";
