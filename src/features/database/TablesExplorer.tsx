@@ -67,10 +67,32 @@ type ModalState =
   | { kind: "er"; focus?: string }
   | null;
 
-function q(schema: string, name: string) {
-  const s = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  return schema && schema !== "main" ? `${s(schema)}.${s(name)}` : s(name);
+/**
+ * Engine-specific identifier quoting.
+ * MySQL uses backticks by default; SQLite/Postgres use ANSI double quotes.
+ * (SQL_MODE=ANSI_QUOTES on MySQL also accepts double quotes, but MySQL's
+ * out-of-the-box behavior is backticks — that's what real MySQL clients emit.)
+ */
+type Dialect = "mysql" | "ansi";
+function dialectFor(engineId: string): Dialect {
+  return engineId === "mysql" || engineId === "mysql-live" ? "mysql" : "ansi";
 }
+function quoteIdent(name: string, dialect: Dialect): string {
+  if (dialect === "mysql") return `\`${name.replace(/`/g, "``")}\``;
+  return `"${name.replace(/"/g, '""')}"`;
+}
+function qTable(schema: string, name: string, dialect: Dialect): string {
+  const q = (v: string) => quoteIdent(v, dialect);
+  // MySQL has databases, not schemas: only qualify when a non-default schema is present.
+  // For SQLite the pseudo-schema "main" is elided.
+  if (!schema || schema === "main") return q(name);
+  return `${q(schema)}.${q(name)}`;
+}
+/** @deprecated legacy ANSI helper — retained for non-preview call sites. */
+function q(schema: string, name: string) {
+  return qTable(schema, name, "ansi");
+}
+void q;
 
 function tableDescription(t: EnrichedTable): string {
   const parts: string[] = [];
