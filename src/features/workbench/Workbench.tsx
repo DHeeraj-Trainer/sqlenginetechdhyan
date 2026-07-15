@@ -99,6 +99,17 @@ function WorkbenchInner() {
   const [activeResultIdx, setActiveResultIdx] = useState(0);
   const [lastQuery, setLastQuery] = useState("");
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const [consolePrefill, setConsolePrefill] = useState<{ sql: string; v: number } | null>(null);
+
+  const sendToConsole = useCallback(
+    (sql: string) => {
+      setConsolePrefill({ sql, v: Date.now() });
+      setSidebar("console");
+      if (isMobile) setMobileSidebarOpen(true);
+      else if (!sidebarOpen) setSidebarOpen(true);
+    },
+    [isMobile, sidebarOpen, setSidebarOpen],
+  );
 
   const { tabs, activeId, setActiveId, openNewTab, updateContent, closeTab } = useEditorTabs();
   const { history, push: pushHistory, clear: clearHistory } = useQueryHistory();
