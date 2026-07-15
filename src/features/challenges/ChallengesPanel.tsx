@@ -147,9 +147,12 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
         filters={filters}
         onChange={setFilters}
         domains={domains}
+        companies={companyNames}
+        concepts={conceptOptions}
         totalChallenges={CHALLENGES.length}
         totalSolved={state.solved.length}
         totalXP={state.xp}
+        matchCount={filteredAll.length}
       />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex min-h-0 flex-1 flex-col">
