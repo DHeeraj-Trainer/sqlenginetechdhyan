@@ -41,6 +41,8 @@ import { MonacoSqlEditor } from "@/features/sql-editor/MonacoSqlEditor";
 import { ResultsGrid } from "@/features/database/ResultsGrid";
 import { DatabaseExplorer } from "@/features/database/DatabaseExplorer";
 import { TablesExplorer } from "@/features/database/TablesExplorer";
+import { MysqlConnectDialog } from "@/features/workbench/MysqlConnectDialog";
+import type { StoredMysqlConnection } from "@/lib/mysql-live.functions";
 import { AiTutorPanel } from "@/features/ai/AiTutorPanel";
 import { LearnPanel } from "@/features/tutorials/LearnPanel";
 import {
@@ -591,39 +593,68 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
     postgres: "PostgreSQL (PGlite)",
     alasql: "AlaSQL",
     mysql: "MySQL (emulated)",
+    "mysql-live": "MySQL (live)",
   };
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const { engine, attachLiveMysqlConnection } = useEngine();
+  const [activeConnId, setActiveConnId] = useState<string | null>(() => {
+    if (engine && engine.id === "mysql-live") {
+      return (engine as unknown as { getConnection?: () => { id: string } | null }).getConnection?.()?.id ?? null;
+    }
+    return null;
+  });
+  useEffect(() => {
+    if (engine && engine.id === "mysql-live") {
+      const c = (engine as unknown as { getConnection?: () => { id: string } | null }).getConnection?.();
+      setActiveConnId(c?.id ?? null);
+    } else {
+      setActiveConnId(null);
+    }
+  }, [engine]);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="sm" variant="outline" className="h-8">
-          <Layers className="mr-1 h-3.5 w-3.5" />
-          {labels[engineId]}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuLabel>SQL engine</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {(["sqlite", "postgres", "alasql", "mysql"] as EngineId[]).map((id) => (
-          <DropdownMenuItem key={id} onClick={() => void onSwitch(id)}>
-            {labels[id]} {engineId === id && "✓"}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="outline" className="h-8">
+            <Layers className="mr-1 h-3.5 w-3.5" />
+            {labels[engineId]}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuLabel>SQL engine</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {(["sqlite", "postgres", "alasql", "mysql"] as EngineId[]).map((id) => (
+            <DropdownMenuItem key={id} onClick={() => void onSwitch(id)}>
+              {labels[id]} {engineId === id && "✓"}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setDialogOpen(true)}>
+            Connect MySQL server… {engineId === "mysql-live" && "✓"}
           </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() =>
-            toast.info("Connect a real MySQL server", {
-              description:
-                "The in-browser MySQL emulator covers standard tutorial and interview SQL. To run against a real MySQL host, add MYSQL_HOST/PORT/USER/PASSWORD/DATABASE as project secrets — a server proxy can then execute your queries.",
-              duration: 8000,
-            })
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <MysqlConnectDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        activeConnectionId={activeConnId}
+        onActivate={async (conn: StoredMysqlConnection) => {
+          await onSwitch("mysql-live");
+          // Uses the engine ref inside the provider — no stale closure race.
+          const attached = await attachLiveMysqlConnection(conn);
+          if (!attached) {
+            // Provider re-renders happen on the next microtask after switchEngine;
+            // retry once so the connection binds reliably.
+            setTimeout(() => void attachLiveMysqlConnection(conn), 50);
           }
-        >
-          Connect MySQL server…
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          setActiveConnId(conn.id);
+        }}
+        onDisconnect={() => setActiveConnId(null)}
+      />
+    </>
   );
 }
+
 
 function SidebarRail({
   active,

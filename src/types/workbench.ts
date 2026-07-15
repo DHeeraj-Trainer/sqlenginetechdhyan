@@ -1,5 +1,5 @@
 // Common types for the workbench.
-export type EngineId = "sqlite" | "postgres" | "alasql" | "mysql";
+export type EngineId = "sqlite" | "postgres" | "alasql" | "mysql" | "mysql-live";
 
 export interface ColumnMeta {
   name: string;

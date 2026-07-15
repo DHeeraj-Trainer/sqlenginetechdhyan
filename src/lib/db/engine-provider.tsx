@@ -5,6 +5,7 @@ import { SqliteEngine } from "@/lib/db/engines/sqlite";
 import { PostgresEngine } from "@/lib/db/engines/postgres";
 import { AlaSqlEngine } from "@/lib/db/engines/alasql";
 import { MysqlEmulationEngine } from "@/lib/db/engines/mysql";
+import { MysqlLiveEngine } from "@/lib/db/engines/mysql-live";
 import { buildScript } from "@/lib/db/sample-builder";
 import { sampleDatabases } from "@/lib/db/sample-databases";
 import {
@@ -33,6 +34,12 @@ interface EngineContextValue {
   refreshTables: () => Promise<void>;
   refreshCatalog: () => Promise<void>;
   runQuery: (sql: string) => Promise<{ results: QueryResult[] | null; error: string | null; durationMs: number }>;
+  /**
+   * If the live-MySQL engine is currently active, attach the given connection
+   * to it and refresh the catalog. Otherwise a no-op. Returns true when
+   * attached.
+   */
+  attachLiveMysqlConnection: (conn: import("@/lib/mysql-live.functions").StoredMysqlConnection) => Promise<boolean>;
 }
 
 
@@ -44,6 +51,7 @@ const engineFactories: Record<EngineId, () => SqlEngine> = {
   postgres: () => new PostgresEngine(),
   alasql: () => new AlaSqlEngine(),
   mysql: () => new MysqlEmulationEngine(),
+  "mysql-live": () => new MysqlLiveEngine(),
 };
 
 export function EngineProvider({ children }: { children: ReactNode }) {
@@ -178,6 +186,17 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     [scheduleRefresh],
   );
 
+  const attachLiveMysqlConnection = useCallback(
+    async (conn: import("@/lib/mysql-live.functions").StoredMysqlConnection) => {
+      const inst = engineRef.current;
+      if (!inst || inst.id !== "mysql-live") return false;
+      (inst as unknown as MysqlLiveEngine).setConnection(conn);
+      await refreshCatalog();
+      return true;
+    },
+    [refreshCatalog],
+  );
+
   const value = useMemo<EngineContextValue>(
     () => ({
       engineId,
@@ -194,14 +213,16 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       refreshTables,
       refreshCatalog,
       runQuery,
+      attachLiveMysqlConnection,
     }),
-    [engineId, engine, status, error, tables, catalog, currentSampleId, routerState, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery],
+    [engineId, engine, status, error, tables, catalog, currentSampleId, routerState, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery, attachLiveMysqlConnection],
   );
 
 
 
   return <EngineContext.Provider value={value}>{children}</EngineContext.Provider>;
 }
+
 
 export function useEngine() {
   const ctx = useContext(EngineContext);
