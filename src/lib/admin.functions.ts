@@ -284,16 +284,15 @@ export const moderateShared = createServerFn({ method: "POST" })
 
 // ---------- Audit log ----------
 
-const auditFiltersSchema = z
-  .object({
-    limit: z.number().int().min(1).max(500).default(100),
-    action: z.string().max(120).optional(),
-    actorId: z.string().uuid().optional(),
-    q: z.string().max(200).optional(),
-    from: z.string().datetime().optional(),
-    to: z.string().datetime().optional(),
-  })
-  .default({ limit: 100 });
+const auditFiltersBase = z.object({
+  limit: z.number().int().min(1).max(50_000).default(100),
+  action: z.string().max(120).optional(),
+  actorId: z.string().uuid().optional(),
+  q: z.string().max(200).optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+const auditFiltersSchema = auditFiltersBase.default({ limit: 100 });
 
 function buildAuditQuery(client: any, f: z.infer<typeof auditFiltersSchema>, limit: number) {
   let q = client
