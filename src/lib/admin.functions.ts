@@ -284,31 +284,90 @@ export const moderateShared = createServerFn({ method: "POST" })
 
 // ---------- Audit log ----------
 
+const auditFiltersSchema = z
+  .object({
+    limit: z.number().int().min(1).max(500).default(100),
+    action: z.string().max(120).optional(),
+    actorId: z.string().uuid().optional(),
+    q: z.string().max(200).optional(),
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+  })
+  .default({ limit: 100 });
+
+function buildAuditQuery(client: any, f: z.infer<typeof auditFiltersSchema>, limit: number) {
+  let q = client
+    .from("audit_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (f.action) q = q.ilike("action", `%${f.action}%`);
+  if (f.actorId) q = q.eq("actor_id", f.actorId);
+  if (f.from) q = q.gte("created_at", f.from);
+  if (f.to) q = q.lte("created_at", f.to);
+  if (f.q) {
+    // Postgres OR filter across action, actor_email, target_type, target_id.
+    const like = f.q.replace(/[%,]/g, "");
+    q = q.or(
+      `action.ilike.%${like}%,actor_email.ilike.%${like}%,target_type.ilike.%${like}%,target_id.ilike.%${like}%`,
+    );
+  }
+  return q;
+}
+
 export const listAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => auditFiltersSchema.parse(d ?? {}))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await buildAuditQuery(supabaseAdmin, data, data.limit);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+const CSV_MAX_ROWS = 50_000;
+function csvCell(v: unknown) {
+  if (v === null || v === undefined) return "";
+  const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+export const exportAuditLog = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z
-      .object({
-        limit: z.number().int().min(1).max(500).default(100),
-        action: z.string().optional(),
-        actorId: z.string().uuid().optional(),
-      })
-      .parse(d ?? {}),
+    auditFiltersSchema.extend({ limit: z.number().int().min(1).max(CSV_MAX_ROWS).default(CSV_MAX_ROWS) }).parse(d ?? {}),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    let q = supabaseAdmin
-      .from("audit_log")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(data.limit);
-    if (data.action) q = q.ilike("action", `%${data.action}%`);
-    if (data.actorId) q = q.eq("actor_id", data.actorId);
-    const { data: rows, error } = await q;
+    const { data: rows, error } = await buildAuditQuery(supabaseAdmin, data, data.limit);
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    const columns = [
+      "created_at",
+      "action",
+      "actor_id",
+      "actor_email",
+      "target_type",
+      "target_id",
+      "request_id",
+      "ip",
+      "user_agent",
+      "before",
+      "after",
+      "metadata",
+    ] as const;
+    const header = columns.join(",");
+    const body = (rows ?? [])
+      .map((r: any) => columns.map((c) => csvCell(r[c])).join(","))
+      .join("\n");
+    return {
+      csv: `${header}\n${body}`,
+      rowCount: rows?.length ?? 0,
+      truncated: (rows?.length ?? 0) >= data.limit,
+    };
   });
+
 
 // ---------- Self ----------
 
