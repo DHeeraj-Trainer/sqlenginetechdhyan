@@ -640,23 +640,12 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
         activeConnectionId={activeConnId}
         onActivate={async (conn: StoredMysqlConnection) => {
           await onSwitch("mysql-live");
-          // Wire the selected connection onto whichever mysql-live instance
-          // is now active. `engine` may briefly point to the previous engine
-          // until React re-renders, so fall back to the ref exposed by the
-          // provider via window.__wb (available in DEV) or retry once on
-          // next tick.
-          const attach = () => {
-            const inst = (engine as unknown as { id: string; setConnection?: (c: StoredMysqlConnection) => void }) ?? null;
-            if (inst && inst.id === "mysql-live" && inst.setConnection) {
-              inst.setConnection(conn);
-              return true;
-            }
-            return false;
-          };
-          if (!attach()) {
-            // Give the provider a tick to swap engines, then retry.
-            setTimeout(attach, 50);
-            setTimeout(attach, 200);
+          // Uses the engine ref inside the provider — no stale closure race.
+          const attached = await attachLiveMysqlConnection(conn);
+          if (!attached) {
+            // Provider re-renders happen on the next microtask after switchEngine;
+            // retry once so the connection binds reliably.
+            setTimeout(() => void attachLiveMysqlConnection(conn), 50);
           }
           setActiveConnId(conn.id);
         }}
