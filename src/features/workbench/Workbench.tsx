@@ -46,6 +46,7 @@ import { MysqlConnectDialog } from "@/features/workbench/MysqlConnectDialog";
 import type { StoredMysqlConnection } from "@/lib/mysql-live.functions";
 import { AiTutorPanel } from "@/features/ai/AiTutorPanel";
 import { LearnPanel } from "@/features/tutorials/LearnPanel";
+import { MysqlCompatPanel } from "@/features/workbench/MysqlCompatPanel";
 import {
   useEditorTabs,
   useQueryHistory,
