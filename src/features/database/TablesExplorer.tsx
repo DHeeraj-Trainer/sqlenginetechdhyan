@@ -213,6 +213,7 @@ export function TablesExplorer({ onInsertQuery, onSendToConsole }: Props) {
                 allTables={allTables}
                 openModal={openModal}
                 onInsertQuery={onInsertQuery}
+                onSendToConsole={onSendToConsole}
               />
             ))}
           </div>
