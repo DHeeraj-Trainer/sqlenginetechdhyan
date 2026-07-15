@@ -30,8 +30,8 @@ import type { EngineId, QueryResult } from "@/types/workbench";
  * MySQL server.
  */
 export class MysqlEmulationEngine extends SqliteEngine {
-  readonly id: EngineId = "mysql";
-  readonly label = "MySQL (emulated)";
+  readonly id = "mysql" as EngineId;
+  readonly label = "MySQL (emulated)" as string;
 
   async exec(sql: string): Promise<QueryResult[]> {
     return super.exec(translateMysql(sql));
