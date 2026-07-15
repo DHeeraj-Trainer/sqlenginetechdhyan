@@ -39,10 +39,11 @@ interface EngineContextValue {
 
 const EngineContext = createContext<EngineContextValue | null>(null);
 
-const engineFactories: Record<Exclude<EngineId, "mysql">, () => SqlEngine> = {
+const engineFactories: Record<EngineId, () => SqlEngine> = {
   sqlite: () => new SqliteEngine(),
   postgres: () => new PostgresEngine(),
   alasql: () => new AlaSqlEngine(),
+  mysql: () => new MysqlEmulationEngine(),
 };
 
 export function EngineProvider({ children }: { children: ReactNode }) {
