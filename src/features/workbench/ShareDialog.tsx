@@ -84,6 +84,9 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
   const [creating, setCreating] = useState(false);
   const [shares, setShares] = useState<ShareRow[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmRow, setConfirmRow] = useState<ShareRow | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expiring" | "expired" | "revoked">("all");
+  const [sortKey, setSortKey] = useState<"created-desc" | "expires-asc" | "expires-desc">("created-desc");
 
   useEffect(() => {
     if (open) setTitle(defaultTitle);
