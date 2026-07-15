@@ -703,6 +703,7 @@ function SidebarBody({
       className="h-full"
     >
       {section === "database" && <DatabaseExplorer onInsertQuery={onInsert} />}
+      {section === "tables" && <TablesExplorer onInsertQuery={onInsert} />}
       {section === "history" && (
         <HistoryList history={history} onLoad={onLoadNewTab} onClear={onClearHistory} />
       )}
