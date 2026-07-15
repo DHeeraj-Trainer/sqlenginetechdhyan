@@ -577,7 +577,7 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
     sqlite: "SQLite (sql.js)",
     postgres: "PostgreSQL (PGlite)",
     alasql: "AlaSQL",
-    mysql: "MySQL (server)",
+    mysql: "MySQL (emulated)",
   };
   return (
     <DropdownMenu>
@@ -590,19 +590,22 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
       <DropdownMenuContent align="start">
         <DropdownMenuLabel>SQL engine</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {(["sqlite", "postgres", "alasql"] as EngineId[]).map((id) => (
+        {(["sqlite", "postgres", "alasql", "mysql"] as EngineId[]).map((id) => (
           <DropdownMenuItem key={id} onClick={() => void onSwitch(id)}>
             {labels[id]} {engineId === id && "✓"}
           </DropdownMenuItem>
         ))}
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() =>
-            toast.info("MySQL requires a server connection", {
-              description: "Provision a MySQL host and add its connection string as a project secret to enable.",
+            toast.info("Connect a real MySQL server", {
+              description:
+                "The in-browser MySQL emulator covers standard tutorial and interview SQL. To run against a real MySQL host, add MYSQL_HOST/PORT/USER/PASSWORD/DATABASE as project secrets — a server proxy can then execute your queries.",
+              duration: 8000,
             })
           }
         >
-          {labels.mysql} (configure)
+          Connect MySQL server…
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
