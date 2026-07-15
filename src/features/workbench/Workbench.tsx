@@ -676,6 +676,7 @@ function SidebarRail({
     { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
     { id: "snippets", label: "Snippets", icon: <Bookmark className="h-4 w-4" /> },
     { id: "learn", label: "Learn", icon: <GraduationCap className="h-4 w-4" /> },
+    { id: "compat", label: "MySQL compatibility", icon: <ShieldCheck className="h-4 w-4" /> },
   ];
   return (
     <nav
