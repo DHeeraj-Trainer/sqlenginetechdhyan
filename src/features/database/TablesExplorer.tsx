@@ -54,6 +54,7 @@ import type {
 
 interface Props {
   onInsertQuery: (sql: string) => void;
+  onSendToConsole?: (sql: string) => void;
 }
 
 type ModalState =
