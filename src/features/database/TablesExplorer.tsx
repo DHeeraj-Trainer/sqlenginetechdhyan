@@ -314,7 +314,9 @@ function TableCard({
     [allTables, table.name],
   );
 
-  const qName = q(table.schema, table.name);
+  const { engineId } = useEngine();
+  const dialect = dialectFor(engineId);
+  const qName = qTable(table.schema, table.name, dialect);
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm transition-all hover:border-primary/40 hover:shadow-md">
