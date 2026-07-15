@@ -35,13 +35,7 @@ interface Props {
 
 export function ChallengesPanel({ onOpenInEditor }: Props) {
   const [state, setState] = useState<ChallengeState>(() => loadState());
-  const [filters, setFilters] = useState<Filters>({
-    q: "",
-    difficulty: "all",
-    status: "all",
-    domain: "all",
-    sort: "default",
-  });
+  const [filters, setFilters] = useState<Filters>(() => ({ ...DEFAULT_FILTERS }));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [tab, setTab] = useState<"topics" | "domains" | "companies" | "interview" | "progress" | "achievements">("topics");
 
