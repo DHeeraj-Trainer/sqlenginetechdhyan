@@ -461,6 +461,8 @@ function WorkbenchInner() {
                 openNewTab(sql);
                 setMobileSidebarOpen(false);
               }}
+              onSendToConsole={sendToConsole}
+              consolePrefill={consolePrefill}
             />
           </div>
         </SheetContent>
