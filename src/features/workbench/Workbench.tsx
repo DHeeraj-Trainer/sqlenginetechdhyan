@@ -596,7 +596,7 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
     "mysql-live": "MySQL (live)",
   };
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { engine } = useEngine();
+  const { engine, attachLiveMysqlConnection } = useEngine();
   const [activeConnId, setActiveConnId] = useState<string | null>(() => {
     if (engine && engine.id === "mysql-live") {
       return (engine as unknown as { getConnection?: () => { id: string } | null }).getConnection?.()?.id ?? null;
