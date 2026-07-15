@@ -577,6 +577,9 @@ function classifyRelationship(
   return "1:N";
 }
 
+type RelKind = "1:1" | "1:N" | "N:M";
+const REL_KINDS: RelKind[] = ["1:1", "1:N", "N:M"];
+
 function RelationshipsDialog({
   table,
   allTables,
@@ -588,17 +591,40 @@ function RelationshipsDialog({
   onClose: () => void;
   onFocusER: (name: string) => void;
 }) {
-  const outbound = table.foreignKeys.map((fk) => ({
+  const [enabledKinds, setEnabledKinds] = useState<Set<RelKind>>(
+    () => new Set(REL_KINDS),
+  );
+  const [tableQuery, setTableQuery] = useState("");
+
+  const toggleKind = (k: RelKind) => {
+    setEnabledKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  };
+
+  const q = tableQuery.trim().toLowerCase();
+  const matchesTable = (name: string) => !q || name.toLowerCase().includes(q);
+
+  const outboundAll = table.foreignKeys.map((fk) => ({
     fk,
     target: allTables.find((t) => t.name === fk.refTable),
-    kind: classifyRelationship(fk, table),
+    kind: classifyRelationship(fk, table) as RelKind,
   }));
-  const inbound = allTables
-    .flatMap((t) =>
-      t.foreignKeys
-        .filter((fk) => fk.refTable === table.name)
-        .map((fk) => ({ fk, source: t, kind: classifyRelationship(fk, t) })),
-    );
+  const inboundAll = allTables.flatMap((t) =>
+    t.foreignKeys
+      .filter((fk) => fk.refTable === table.name)
+      .map((fk) => ({ fk, source: t, kind: classifyRelationship(fk, t) as RelKind })),
+  );
+
+  const outbound = outboundAll.filter(
+    (o) => enabledKinds.has(o.kind) && matchesTable(o.fk.refTable),
+  );
+  const inbound = inboundAll.filter(
+    (o) => enabledKinds.has(o.kind) && matchesTable(o.source.name),
+  );
 
   // Detect junction table pattern (N:M): this table has 2 FKs to different tables
   const isJunction =
@@ -607,6 +633,23 @@ function RelationshipsDialog({
 
   const parents = Array.from(new Set(outbound.map((o) => o.fk.refTable)));
   const children = Array.from(new Set(inbound.map((i) => i.source.name)));
+
+  const nmItemsRaw = isJunction
+    ? table.foreignKeys.map((fk) => fk.refTable)
+    : allTables
+        .filter(
+          (t) =>
+            t.foreignKeys.length === 2 &&
+            t.foreignKeys.some((fk) => fk.refTable === table.name),
+        )
+        .flatMap((jt) =>
+          jt.foreignKeys
+            .filter((fk) => fk.refTable !== table.name)
+            .map((fk) => `${fk.refTable} (via ${jt.name})`),
+        );
+
+  const filteredCount = outbound.length + inbound.length;
+  const totalCount = outboundAll.length + inboundAll.length;
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -620,12 +663,67 @@ function RelationshipsDialog({
             How this table connects to the rest of your schema
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex flex-wrap items-center gap-2 border-b pb-2">
+          <div className="flex items-center gap-1">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Types
+            </span>
+          </div>
+          {REL_KINDS.map((k) => {
+            const on = enabledKinds.has(k);
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => toggleKind(k)}
+                aria-pressed={on}
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                  on
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-muted-foreground/30 text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {k}
+              </button>
+            );
+          })}
+          <div className="relative ml-auto min-w-[180px] flex-1 sm:flex-none">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={tableQuery}
+              onChange={(e) => setTableQuery(e.target.value)}
+              placeholder="Filter by table…"
+              className="h-7 pl-7 text-xs"
+            />
+            {tableQuery && (
+              <button
+                type="button"
+                onClick={() => setTableQuery("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted"
+                aria-label="Clear filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <span className="text-[10px] text-muted-foreground">
+            {filteredCount}/{totalCount} FKs
+          </span>
+        </div>
+
         <ScrollArea className="max-h-[65vh] pr-2">
           <div className="space-y-4 text-xs">
             <RelSection
               title="Foreign Keys (outgoing)"
               icon={<Link2 className="h-3.5 w-3.5" />}
-              empty="No outgoing foreign keys"
+              empty={
+                outboundAll.length === 0
+                  ? "No outgoing foreign keys"
+                  : "No outgoing FKs match the current filters"
+              }
             >
               {outbound.map((o, i) => (
                 <div
@@ -653,7 +751,11 @@ function RelationshipsDialog({
             <RelSection
               title="Referenced By (incoming)"
               icon={<Link2 className="h-3.5 w-3.5 rotate-180" />}
-              empty="No tables reference this one"
+              empty={
+                inboundAll.length === 0
+                  ? "No tables reference this one"
+                  : "No incoming FKs match the current filters"
+              }
             >
               {inbound.map((o, i) => (
                 <div
@@ -679,38 +781,32 @@ function RelationshipsDialog({
             </RelSection>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <RelBucket
-                title="One-to-One"
-                items={[
-                  ...outbound.filter((o) => o.kind === "1:1").map((o) => o.fk.refTable),
-                  ...inbound.filter((o) => o.kind === "1:1").map((o) => o.source.name),
-                ]}
-                color="emerald"
-              />
-              <RelBucket
-                title="One-to-Many"
-                items={inbound.filter((o) => o.kind === "1:N").map((o) => o.source.name)}
-                color="sky"
-              />
-              <RelBucket
-                title="Many-to-Many"
-                items={
-                  isJunction
-                    ? table.foreignKeys.map((fk) => fk.refTable)
-                    : allTables
-                        .filter(
-                          (t) =>
-                            t.foreignKeys.length === 2 &&
-                            t.foreignKeys.some((fk) => fk.refTable === table.name),
-                        )
-                        .flatMap((jt) =>
-                          jt.foreignKeys
-                            .filter((fk) => fk.refTable !== table.name)
-                            .map((fk) => `${fk.refTable} (via ${jt.name})`),
-                        )
-                }
-                color="fuchsia"
-              />
+              {enabledKinds.has("1:1") && (
+                <RelBucket
+                  title="One-to-One"
+                  items={[
+                    ...outbound.filter((o) => o.kind === "1:1").map((o) => o.fk.refTable),
+                    ...inbound.filter((o) => o.kind === "1:1").map((o) => o.source.name),
+                  ]}
+                  color="emerald"
+                />
+              )}
+              {enabledKinds.has("1:N") && (
+                <RelBucket
+                  title="One-to-Many"
+                  items={inbound.filter((o) => o.kind === "1:N").map((o) => o.source.name)}
+                  color="sky"
+                />
+              )}
+              {enabledKinds.has("N:M") && (
+                <RelBucket
+                  title="Many-to-Many"
+                  items={nmItemsRaw.filter((name) =>
+                    matchesTable(name.replace(/ \(via .*\)$/, "")),
+                  )}
+                  color="fuchsia"
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -723,6 +819,7 @@ function RelationshipsDialog({
     </Dialog>
   );
 }
+
 
 function RelSection({
   title,
