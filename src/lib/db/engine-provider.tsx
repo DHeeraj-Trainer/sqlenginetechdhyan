@@ -4,6 +4,7 @@ import type { EngineId, QueryResult, SqlEngine, TableInfo } from "@/types/workbe
 import { SqliteEngine } from "@/lib/db/engines/sqlite";
 import { PostgresEngine } from "@/lib/db/engines/postgres";
 import { AlaSqlEngine } from "@/lib/db/engines/alasql";
+import { MysqlEmulationEngine } from "@/lib/db/engines/mysql";
 import { buildScript } from "@/lib/db/sample-builder";
 import { sampleDatabases } from "@/lib/db/sample-databases";
 import {
