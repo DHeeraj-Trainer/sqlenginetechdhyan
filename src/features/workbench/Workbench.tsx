@@ -420,6 +420,14 @@ function WorkbenchInner() {
         lastError={runError}
         onApplyQuery={applyTutorSql}
       />
+
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        defaultTitle={activeTab?.name ?? "Shared query"}
+        sql={activeTab?.content ?? ""}
+        engineId={engineId}
+      />
     </div>
   );
 }
