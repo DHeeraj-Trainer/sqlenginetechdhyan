@@ -1099,10 +1099,12 @@ function SqlPreviewDialog({
   table,
   onClose,
   onInsert,
+  onSendToConsole,
 }: {
   table: EnrichedTable;
   onClose: () => void;
   onInsert: (sql: string) => void;
+  onSendToConsole?: (sql: string) => void;
 }) {
   const qName = q(table.schema, table.name);
   const snippets: { label: string; sql: string }[] = [
