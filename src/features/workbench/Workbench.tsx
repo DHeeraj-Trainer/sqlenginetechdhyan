@@ -885,7 +885,7 @@ function ResultsHeader({
           ))}
         </ul>
       )}
-      {error && <span className="text-destructive">{error.slice(0, 100)}</span>}
+      {error && <span className="text-destructive">{stripDiagnosticMarker(error).slice(0, 100)}</span>}
       {engineError && <span className="text-destructive">Engine: {engineError}</span>}
     </div>
   );
