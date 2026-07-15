@@ -184,6 +184,8 @@ const shareInput = z.object({
   sql: z.string().min(1).max(200_000),
   engine: z.enum(["sqlite", "postgres", "alasql", "mysql"]),
   visibility: z.enum(["public", "workspace"]).default("public"),
+  // TTL in hours; null / undefined = never expires.
+  ttlHours: z.number().int().positive().max(24 * 365).optional(),
 });
 
 export const createShare = createServerFn({ method: "POST" })
@@ -191,6 +193,9 @@ export const createShare = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => shareInput.parse(d))
   .handler(async ({ data, context }) => {
     const slug = slugify();
+    const expiresAt = data.ttlHours
+      ? new Date(Date.now() + data.ttlHours * 3_600_000).toISOString()
+      : null;
     const { data: row, error } = await context.supabase
       .from("shared_queries")
       .insert({
@@ -201,11 +206,38 @@ export const createShare = createServerFn({ method: "POST" })
         sql: data.sql,
         engine: data.engine,
         visibility: data.visibility,
+        expires_at: expiresAt,
       })
-      .select("slug")
+      .select("slug,token,expires_at")
       .single();
     if (error) throw new Error(error.message);
     return row;
+  });
+
+export const revokeShare = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("shared_queries")
+      .update({ revoked: true })
+      .eq("id", data.id)
+      .eq("owner_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const listMyShares = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("shared_queries")
+      .select("id,slug,title,engine,visibility,view_count,expires_at,revoked,created_at")
+      .eq("owner_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return data ?? [];
   });
 
 export const getSharedQuery = createServerFn({ method: "GET" })
@@ -220,21 +252,26 @@ export const getSharedQuery = createServerFn({ method: "GET" })
           const h = new Headers(init?.headers);
           if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) h.delete("Authorization");
           h.set("apikey", key);
-          return fetch(input, { ...init, headers: h });
+          return fetch(input, { ...input, headers: h } as RequestInit);
         },
       },
     });
+    // The refreshed RLS policy already filters revoked/expired rows,
+    // but we filter here too so this handler is defensive against
+    // policy changes and returns a clean 404 shape.
     const { data: row, error } = await client
       .from("shared_queries")
-      .select("slug,title,description,sql,engine,visibility,view_count,created_at")
+      .select("slug,title,description,sql,engine,visibility,view_count,expires_at,created_at")
       .eq("slug", data.slug)
       .eq("visibility", "public")
+      .eq("revoked", false)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!row) return null;
-    // fire-and-forget view counter (best effort)
-    void client.from("shared_queries").update({ view_count: (row.view_count ?? 0) + 1 }).eq("slug", data.slug);
+    if (row.expires_at && new Date(row.expires_at).getTime() < Date.now()) return null;
+    void client.from("shared_queries").update({ view_count: (row as any).view_count + 1 || 1 }).eq("slug", data.slug);
     return row;
   });
 
 export type WbEngineId = EngineId;
+
