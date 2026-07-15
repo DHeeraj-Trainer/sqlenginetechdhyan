@@ -246,9 +246,37 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
               Your share links
             </h3>
             {shares && (
-              <span className="text-[11px] text-muted-foreground">{shares.length} total</span>
+              <span className="text-[11px] text-muted-foreground">
+                {visibleShares?.length ?? 0} of {shares.length}
+              </span>
             )}
           </div>
+          {shares && shares.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                <SelectTrigger className="h-7 w-auto min-w-[120px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="expiring">Expiring ≤ 7d</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="revoked">Revoked</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as typeof sortKey)}>
+                <SelectTrigger className="h-7 w-auto min-w-[140px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created-desc">Newest first</SelectItem>
+                  <SelectItem value="expires-asc">Expires soonest</SelectItem>
+                  <SelectItem value="expires-desc">Expires latest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="max-h-72 overflow-y-auto rounded border">
             {shares === null ? (
               <div className="flex items-center justify-center p-6 text-xs text-muted-foreground">
@@ -258,9 +286,13 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
               <div className="p-6 text-center text-xs text-muted-foreground">
                 No share links yet.
               </div>
+            ) : visibleShares && visibleShares.length === 0 ? (
+              <div className="p-6 text-center text-xs text-muted-foreground">
+                No links match this filter.
+              </div>
             ) : (
               <ul className="divide-y">
-                {shares.map((r) => {
+                {(visibleShares ?? []).map((r) => {
                   const st = status(r);
                   const tone =
                     st.tone === "ok"
@@ -312,7 +344,7 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
                         variant="ghost"
                         className="h-7 px-2 text-rose-400 hover:text-rose-300"
                         disabled={r.revoked || busyId === r.id}
-                        onClick={() => revoke(r)}
+                        onClick={() => setConfirmRow(r)}
                         aria-label="Revoke link"
                       >
                         {busyId === r.id ? (
@@ -329,6 +361,34 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
           </div>
         </section>
       </DialogContent>
+
+      <AlertDialog open={!!confirmRow} onOpenChange={(v) => !v && setConfirmRow(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke this share link?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRow ? (
+                <>
+                  <span className="font-medium text-foreground">
+                    {confirmRow.title || "Untitled share"}
+                  </span>{" "}
+                  <span className="font-mono text-xs">(/s/{confirmRow.slug})</span> will stop
+                  working immediately for anyone who has the link. This cannot be undone.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRevoke}
+              className="bg-rose-500 text-white hover:bg-rose-600"
+            >
+              Revoke link
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
