@@ -47,6 +47,7 @@ import type { StoredMysqlConnection } from "@/lib/mysql-live.functions";
 import { AiTutorPanel } from "@/features/ai/AiTutorPanel";
 import { LearnPanel } from "@/features/tutorials/LearnPanel";
 import { MysqlCompatPanel } from "@/features/workbench/MysqlCompatPanel";
+import { SqlConsole } from "@/features/workbench/SqlConsole";
 import { extractDiagnostic, MYSQL_DIAG_MARKER, type MysqlDiagnostic } from "@/lib/db/engines/mysql-diagnostics";
 import {
   useEditorTabs,
