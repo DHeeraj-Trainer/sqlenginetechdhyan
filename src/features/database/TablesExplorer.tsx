@@ -1230,35 +1230,50 @@ function SqlPreviewDialog({
   onInsert: (sql: string) => void;
   onSendToConsole?: (sql: string) => void;
 }) {
-  const qName = q(table.schema, table.name);
+  const { engineId } = useEngine();
+  const dialect = dialectFor(engineId);
+  const isMysql = dialect === "mysql";
+  const qName = qTable(table.schema, table.name, dialect);
+  const qCol = (name: string) => quoteIdent(name, dialect);
+  const pkCol = table.primaryKey[0];
+  const qPk = pkCol ? qCol(pkCol) : qCol("id");
+  const allCols = table.columns.map((c) => qCol(c.name)).join(", ");
+  const setCols = table.columns
+    .filter((c) => !c.pk)
+    .slice(0, 3)
+    .map((c) => `${qCol(c.name)} = ?`)
+    .join(", ");
+  // MySQL supports both `LIMIT count OFFSET offset` (portable) and the
+  // MySQL-only shorthand `LIMIT offset, count`. Real MySQL clients emit the
+  // shorthand for pagination — we render it here for the MySQL dialects.
+  const paginationSql = isMysql
+    ? `SELECT * FROM ${qName}\nORDER BY ${qPk}\nLIMIT 20, 20;  -- offset, count (MySQL)`
+    : `SELECT * FROM ${qName}\nORDER BY ${qPk}\nLIMIT 20 OFFSET 20;`;
+
   const snippets: { label: string; sql: string }[] = [
     { label: "SELECT *", sql: `SELECT * FROM ${qName} LIMIT 100;` },
     {
       label: "SELECT columns",
-      sql: `SELECT ${table.columns.map((c) => c.name).join(", ")}\nFROM ${qName}\nLIMIT 100;`,
+      sql: `SELECT ${allCols}\nFROM ${qName}\nLIMIT 100;`,
     },
     { label: "COUNT(*)", sql: `SELECT COUNT(*) AS total FROM ${qName};` },
     {
+      label: `Paginated (${isMysql ? "MySQL LIMIT offset, count" : "LIMIT / OFFSET"})`,
+      sql: paginationSql,
+    },
+    {
       label: "INSERT template",
-      sql: `INSERT INTO ${qName} (${table.columns.map((c) => c.name).join(", ")})\nVALUES (${table.columns
+      sql: `INSERT INTO ${qName} (${allCols})\nVALUES (${table.columns
         .map(() => "?")
         .join(", ")});`,
     },
     {
       label: "UPDATE template",
-      sql: `UPDATE ${qName}\nSET ${table.columns
-        .filter((c) => !c.pk)
-        .slice(0, 3)
-        .map((c) => `${c.name} = ?`)
-        .join(", ")}\nWHERE ${
-        table.primaryKey[0] ? `${table.primaryKey[0]} = ?` : "id = ?"
-      };`,
+      sql: `UPDATE ${qName}\nSET ${setCols}\nWHERE ${qPk} = ?;`,
     },
     {
       label: "DELETE template",
-      sql: `DELETE FROM ${qName} WHERE ${
-        table.primaryKey[0] ? `${table.primaryKey[0]} = ?` : "id = ?"
-      };`,
+      sql: `DELETE FROM ${qName} WHERE ${qPk} = ?;`,
     },
   ];
   if (table.ddl) snippets.push({ label: "DDL", sql: table.ddl });
