@@ -78,7 +78,9 @@ function assertDiagnostic(label, result, expected) {
   return diag;
 }
 
-/** After a runAndRender call, wait for ErrorPanel and assert its contents. */
+/** After a runAndRender call, wait for ErrorPanel and assert its contents.
+ *  Uses case-insensitive substring matches because ErrorPanel headings use
+ *  Tailwind's `uppercase` class, which innerText reflects. */
 async function assertErrorPanel(page, label, expected) {
   try {
     await page.getByText("Query failed").first().waitFor({ state: "visible", timeout: 10_000 });
@@ -86,8 +88,8 @@ async function assertErrorPanel(page, label, expected) {
     return fail(`${label}: "Query failed" header never appeared in results area`);
   }
 
-  const bodyText = await page.locator("body").innerText();
-  const has = (needle) => bodyText.includes(needle);
+  const bodyText = (await page.locator("body").innerText()).toLowerCase();
+  const has = (needle) => bodyText.includes(needle.toLowerCase());
 
   if (!has("Why this failed (MySQL emulation)")) {
     return fail(`${label}: missing "Why this failed (MySQL emulation)" section`);
