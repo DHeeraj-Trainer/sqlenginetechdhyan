@@ -40,6 +40,7 @@ import { EngineProvider, useEngine } from "@/lib/db/engine-provider";
 import { MonacoSqlEditor } from "@/features/sql-editor/MonacoSqlEditor";
 import { ResultsGrid } from "@/features/database/ResultsGrid";
 import { DatabaseExplorer } from "@/features/database/DatabaseExplorer";
+import { TablesExplorer } from "@/features/database/TablesExplorer";
 import { AiTutorPanel } from "@/features/ai/AiTutorPanel";
 import { LearnPanel } from "@/features/tutorials/LearnPanel";
 import {
