@@ -118,16 +118,27 @@ function WorkbenchInner() {
   // running against a preview build (import.meta.env.DEV).
   useEffect(() => {
     const w = window as unknown as {
-      __wb?: { runQuery: (sql: string) => Promise<unknown>; engineId: string };
+      __wb?: {
+        runQuery: (sql: string) => Promise<unknown>;
+        engineId: string;
+        switchEngine: (id: EngineId) => Promise<void>;
+        status: string;
+      };
       __wbEnableTestBridge?: boolean;
     };
     if (import.meta.env.DEV || w.__wbEnableTestBridge) {
-      w.__wb = { runQuery: (sql: string) => runQuery(sql), engineId };
+      w.__wb = {
+        runQuery: (sql: string) => runQuery(sql),
+        engineId,
+        switchEngine: (id: EngineId) => switchEngine(id),
+        status,
+      };
     }
     return () => {
       if (w.__wb) delete w.__wb;
     };
-  }, [runQuery, engineId]);
+  }, [runQuery, engineId, switchEngine, status]);
+
 
   const runActive = useCallback(async () => {
     if (!activeTab) return;

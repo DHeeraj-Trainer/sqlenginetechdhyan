@@ -173,16 +173,19 @@ function transformCode(code: string): string {
 
   // AUTO_INCREMENT → AUTOINCREMENT (SQLite requires INTEGER PRIMARY KEY AUTOINCREMENT)
   s = s.replace(/\bAUTO_INCREMENT\b/gi, "AUTOINCREMENT");
+  // MySQL allows `INT AUTO_INCREMENT PRIMARY KEY`; SQLite requires the
+  // AUTOINCREMENT keyword to come AFTER `PRIMARY KEY`. Normalize both orders.
+  s = s.replace(/\bAUTOINCREMENT\s+PRIMARY\s+KEY\b/gi, "PRIMARY KEY AUTOINCREMENT");
 
   // UNSIGNED / ZEROFILL → drop
   s = s.replace(/\b(UNSIGNED|ZEROFILL)\b/gi, "");
 
   // Numeric type mapping (with optional length)
-  s = s.replace(/\b(?:TINYINT|SMALLINT|MEDIUMINT|INT|INTEGER|BIGINT|BIT)\s*(?:\(\s*\d+\s*(?:,\s*\d+\s*)?\))?/gi, "INTEGER");
-  s = s.replace(/\b(?:DOUBLE(?:\s+PRECISION)?|FLOAT|REAL|DECIMAL|NUMERIC|DEC|FIXED)\s*(?:\(\s*\d+\s*(?:,\s*\d+\s*)?\))?/gi, "REAL");
+  s = s.replace(/\b(?:INTEGER|TINYINT|SMALLINT|MEDIUMINT|BIGINT|INT|BIT)(?![A-Z0-9_])(?:\s*\(\s*\d+\s*(?:,\s*\d+\s*)?\))?/gi, "INTEGER");
+  s = s.replace(/\b(?:DOUBLE(?:\s+PRECISION)?|FLOAT|REAL|DECIMAL|NUMERIC|DEC|FIXED)(?![A-Z0-9_])(?:\s*\(\s*\d+\s*(?:,\s*\d+\s*)?\))?/gi, "REAL");
 
   // Text type mapping
-  s = s.replace(/\b(?:VARCHAR|CHAR|CHARACTER|NVARCHAR|NCHAR|VARBINARY|BINARY|BLOB|TINYBLOB|MEDIUMBLOB|LONGBLOB|TINYTEXT|MEDIUMTEXT|LONGTEXT|TEXT|ENUM|SET)\s*(?:\([^)]*\))?/gi, "TEXT");
+  s = s.replace(/\b(?:VARCHAR|CHAR|CHARACTER|NVARCHAR|NCHAR|VARBINARY|BINARY|BLOB|TINYBLOB|MEDIUMBLOB|LONGBLOB|TINYTEXT|MEDIUMTEXT|LONGTEXT|TEXT|ENUM|SET)(?![A-Z0-9_])(?:\s*\([^)]*\))?/gi, "TEXT");
 
   // Date/time → TEXT (SQLite stores as ISO strings)
   s = s.replace(/\b(?:DATETIME|TIMESTAMP|DATE|TIME|YEAR)\s*(?:\(\s*\d+\s*\))?/gi, "TEXT");

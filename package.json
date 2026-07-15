@@ -10,6 +10,7 @@
     "build:dev": "bunx --package=@tanstack/router-cli tsr generate && node scripts/check-routetree.mjs && vite build --mode development",
     "check:routetree": "bunx --package=@tanstack/router-cli tsr generate && node scripts/check-routetree.mjs",
     "test:smoke": "node tests/e2e/smoke.spec.mjs",
+    "test:e2e:mysql": "node tests/e2e/mysql.spec.mjs",
     "preview": "vite preview",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
