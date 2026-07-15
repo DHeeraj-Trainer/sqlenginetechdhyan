@@ -186,6 +186,17 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     [scheduleRefresh],
   );
 
+  const attachLiveMysqlConnection = useCallback(
+    async (conn: import("@/lib/mysql-live.functions").StoredMysqlConnection) => {
+      const inst = engineRef.current;
+      if (!inst || inst.id !== "mysql-live") return false;
+      (inst as unknown as MysqlLiveEngine).setConnection(conn);
+      await refreshCatalog();
+      return true;
+    },
+    [refreshCatalog],
+  );
+
   const value = useMemo<EngineContextValue>(
     () => ({
       engineId,
@@ -202,14 +213,16 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       refreshTables,
       refreshCatalog,
       runQuery,
+      attachLiveMysqlConnection,
     }),
-    [engineId, engine, status, error, tables, catalog, currentSampleId, routerState, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery],
+    [engineId, engine, status, error, tables, catalog, currentSampleId, routerState, switchEngine, loadSample, refreshTables, refreshCatalog, runQuery, attachLiveMysqlConnection],
   );
 
 
 
   return <EngineContext.Provider value={value}>{children}</EngineContext.Provider>;
 }
+
 
 export function useEngine() {
   const ctx = useContext(EngineContext);
