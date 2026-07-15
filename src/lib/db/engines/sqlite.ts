@@ -4,7 +4,7 @@ import type { EngineId, QueryResult, SqlEngine, TableInfo } from "@/types/workbe
 // SQLite via sql.js. WASM served from /public/wasm/sql-wasm.wasm.
 export class SqliteEngine implements SqlEngine {
   readonly id: EngineId = "sqlite";
-  readonly label = "SQLite (sql.js)";
+  readonly label: string = "SQLite (sql.js)";
   private db: Database | null = null;
   private ready: Promise<void> | null = null;
 
