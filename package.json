@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "node scripts/check-routetree.mjs && vite build",
-    "build:dev": "node scripts/check-routetree.mjs && vite build --mode development",
-    "check:routetree": "node scripts/check-routetree.mjs",
+    "routes:generate": "tsr generate",
+    "build": "bunx --package=@tanstack/router-cli tsr generate && node scripts/check-routetree.mjs && vite build",
+    "build:dev": "bunx --package=@tanstack/router-cli tsr generate && node scripts/check-routetree.mjs && vite build --mode development",
+    "check:routetree": "bunx --package=@tanstack/router-cli tsr generate && node scripts/check-routetree.mjs",
     "test:smoke": "node tests/e2e/smoke.spec.mjs",
     "preview": "vite preview",
     "test": "vitest run --config vitest.config.ts",
@@ -90,7 +91,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
-    "@lovable.dev/vite-tanstack-config": "^2.7.1",
+    "@lovable.dev/vite-tanstack-config": "2.7.4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.16.5",
