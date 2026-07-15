@@ -651,7 +651,6 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
   );
 }
 
-}
 
 function SidebarRail({
   active,
