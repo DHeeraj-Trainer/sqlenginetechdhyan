@@ -748,6 +748,8 @@ function SidebarBody({
   onClearHistory,
   onDeleteSnippet,
   onOpenLearn,
+  onSendToConsole,
+  consolePrefill,
 }: {
   section: SidebarSection;
   history: ReturnType<typeof useQueryHistory>["history"];
@@ -757,6 +759,8 @@ function SidebarBody({
   onClearHistory: () => void;
   onDeleteSnippet: (id: string) => void;
   onOpenLearn: (sql: string) => void;
+  onSendToConsole: (sql: string) => void;
+  consolePrefill: { sql: string; v: number } | null;
 }) {
   return (
     <div
@@ -766,7 +770,12 @@ function SidebarBody({
       className="h-full"
     >
       {section === "database" && <DatabaseExplorer onInsertQuery={onInsert} />}
-      {section === "tables" && <TablesExplorer onInsertQuery={onInsert} />}
+      {section === "tables" && (
+        <TablesExplorer onInsertQuery={onInsert} onSendToConsole={onSendToConsole} />
+      )}
+      {section === "console" && (
+        <SqlConsole prefill={consolePrefill} onOpenInEditor={(sql) => onLoadNewTab(sql)} />
+      )}
       {section === "history" && (
         <HistoryList history={history} onLoad={onLoadNewTab} onClear={onClearHistory} />
       )}
