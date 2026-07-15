@@ -91,11 +91,14 @@ export type Database = {
           created_at: string
           description: string | null
           engine: string
+          expires_at: string | null
           id: string
           owner_id: string
+          revoked: boolean
           slug: string
           sql: string
           title: string
+          token: string
           updated_at: string
           view_count: number
           visibility: string
@@ -104,11 +107,14 @@ export type Database = {
           created_at?: string
           description?: string | null
           engine?: string
+          expires_at?: string | null
           id?: string
           owner_id: string
+          revoked?: boolean
           slug: string
           sql: string
           title?: string
+          token?: string
           updated_at?: string
           view_count?: number
           visibility?: string
@@ -117,11 +123,14 @@ export type Database = {
           created_at?: string
           description?: string | null
           engine?: string
+          expires_at?: string | null
           id?: string
           owner_id?: string
+          revoked?: boolean
           slug?: string
           sql?: string
           title?: string
+          token?: string
           updated_at?: string
           view_count?: number
           visibility?: string
