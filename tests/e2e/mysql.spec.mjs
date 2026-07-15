@@ -444,6 +444,136 @@ async function main() {
     ],
   });
 
+  // --- 6b. Derived tables + subqueries (IN / EXISTS / scalar) -------------
+  // Derived table in FROM: aggregate order_items into a per-order rollup
+  // and JOIN it back to orders. Verify row count + join output.
+  const derivedRes = await run(`
+    SELECT o.\`customer\`, t.\`lines\`, t.\`total_qty\`
+    FROM \`orders\` o
+    INNER JOIN (
+      SELECT \`order_id\`, COUNT(*) AS \`lines\`, SUM(\`qty\`) AS \`total_qty\`
+      FROM \`order_items\`
+      GROUP BY \`order_id\`
+    ) t ON t.\`order_id\` = o.\`id\`
+    ORDER BY o.\`id\`;
+  `);
+  assertResult("derived table aggregate JOIN produces per-order rollup", derivedRes, {
+    columns: ["customer", "lines", "total_qty"],
+    rows: [
+      ["alice", 2, 3],
+      ["carol", 1, 5],
+      ["erin", 1, 3],
+    ],
+  });
+
+  // Row count of derived-table result — sanity-check via COUNT(*) over
+  // the same subquery to prove the two paths agree.
+  const derivedCountRes = await run(`
+    SELECT COUNT(*) AS n FROM (
+      SELECT \`order_id\` FROM \`order_items\` GROUP BY \`order_id\`
+    ) t;
+  `);
+  assertResult("COUNT(*) over derived table matches distinct order_ids", derivedCountRes, {
+    columns: ["n"],
+    rows: [[3]],
+  });
+
+  // Correlated-free IN subquery — orders that have at least one item.
+  const inRes = await run(`
+    SELECT \`id\`, \`customer\`
+    FROM \`orders\`
+    WHERE \`id\` IN (SELECT \`order_id\` FROM \`order_items\`)
+    ORDER BY \`id\`;
+  `);
+  assertResult("WHERE id IN (subquery) returns orders with items", inRes, {
+    columns: ["id", "customer"],
+    rows: [
+      [1, "alice"],
+      [3, "carol"],
+      [5, "erin"],
+    ],
+  });
+
+  // NOT IN — complement of the previous set.
+  const notInRes = await run(`
+    SELECT \`id\`, \`customer\`
+    FROM \`orders\`
+    WHERE \`id\` NOT IN (SELECT \`order_id\` FROM \`order_items\`)
+    ORDER BY \`id\`;
+  `);
+  assertResult("WHERE id NOT IN (subquery) returns orders without items", notInRes, {
+    columns: ["id", "customer"],
+    rows: [
+      [2, "bob"],
+      [4, "dave"],
+    ],
+  });
+
+  // Correlated EXISTS — same semantic as the IN case but via EXISTS.
+  const existsRes = await run(`
+    SELECT o.\`id\`, o.\`customer\`
+    FROM \`orders\` o
+    WHERE EXISTS (
+      SELECT 1 FROM \`order_items\` i WHERE i.\`order_id\` = o.\`id\`
+    )
+    ORDER BY o.\`id\`;
+  `);
+  assertResult("WHERE EXISTS (correlated) matches orders with items", existsRes, {
+    columns: ["id", "customer"],
+    rows: [
+      [1, "alice"],
+      [3, "carol"],
+      [5, "erin"],
+    ],
+  });
+
+  // NOT EXISTS — orders with zero items.
+  const notExistsRes = await run(`
+    SELECT o.\`id\`, o.\`customer\`
+    FROM \`orders\` o
+    WHERE NOT EXISTS (
+      SELECT 1 FROM \`order_items\` i WHERE i.\`order_id\` = o.\`id\`
+    )
+    ORDER BY o.\`id\`;
+  `);
+  assertResult("WHERE NOT EXISTS returns orders with zero items", notExistsRes, {
+    columns: ["id", "customer"],
+    rows: [
+      [2, "bob"],
+      [4, "dave"],
+    ],
+  });
+
+  // Scalar subquery in SELECT — per-order item count as a correlated scalar.
+  const scalarSubRes = await run(`
+    SELECT o.\`customer\`,
+      (SELECT COUNT(*) FROM \`order_items\` i WHERE i.\`order_id\` = o.\`id\`) AS n_items
+    FROM \`orders\` o
+    ORDER BY o.\`id\`;
+  `);
+  assertResult("scalar correlated subquery yields per-order counts", scalarSubRes, {
+    columns: ["customer", "n_items"],
+    rows: [
+      ["alice", 2],
+      ["bob", 0],
+      ["carol", 1],
+      ["dave", 0],
+      ["erin", 1],
+    ],
+  });
+
+  // IN with an explicit value list (non-subquery form) — verify parser
+  // handles backtick columns + string literals.
+  const inListRes = await run(
+    "SELECT `id` FROM `orders` WHERE `customer` IN ('alice', 'carol', 'zoe') ORDER BY `id`;",
+  );
+  assertResult("WHERE col IN (value list) matches literal set", inListRes, {
+    columns: ["id"],
+    rows: [[1], [3]],
+  });
+
+
+
   // --- 7. GROUP BY + HAVING + aggregates ----------------------------------
   const aggRes = await run(`
     SELECT i.\`sku\`, SUM(i.\`qty\`) AS total_qty, COUNT(*) AS lines
