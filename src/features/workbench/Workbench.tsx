@@ -321,6 +321,8 @@ function WorkbenchInner() {
                       onClearHistory={clearHistory}
                       onDeleteSnippet={removeSnippet}
                       onOpenLearn={(sql) => openNewTab(sql)}
+                      onSendToConsole={sendToConsole}
+                      consolePrefill={consolePrefill}
                     />
                   </div>
                 </aside>
