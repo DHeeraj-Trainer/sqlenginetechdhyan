@@ -9,7 +9,7 @@ import type { Challenge } from "./types";
 let n = 0;
 const nx = () => ++n;
 
-export const CHALLENGES: Challenge[] = [
+export const CURATED_CHALLENGES: Challenge[] = [
   // --- SELECT Basics ---
   {
     id: "sel-01",
