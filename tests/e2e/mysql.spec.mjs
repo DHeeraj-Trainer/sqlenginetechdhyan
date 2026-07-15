@@ -250,6 +250,119 @@ async function main() {
     rows: [[5, "erin"]],
   });
 
+  // --- 3c. DISTINCT + CASE WHEN (including NULL branches) -----------------
+  // DISTINCT collapses duplicate customer names (all unique here → 5 rows).
+  const distinctRes = await run(
+    "SELECT DISTINCT `customer` FROM `orders` ORDER BY `customer`;",
+  );
+  assertResult("DISTINCT customer returns unique names", distinctRes, {
+    columns: ["customer"],
+    rows: [["alice"], ["bob"], ["carol"], ["dave"], ["erin"]],
+  });
+
+  // DISTINCT on a derived CASE expression — buckets rows into 3 groups.
+  const distinctCaseRes = await run(`
+    SELECT DISTINCT
+      CASE
+        WHEN \`total\` IS NULL THEN 'unknown'
+        WHEN \`total\` < 10 THEN 'small'
+        WHEN \`total\` < 50 THEN 'medium'
+        ELSE 'large'
+      END AS bucket
+    FROM \`orders\`
+    ORDER BY bucket;
+  `);
+  assertResult("DISTINCT over CASE expression yields unique buckets", distinctCaseRes, {
+    columns: ["bucket"],
+    rows: [["large"], ["medium"], ["small"], ["unknown"]],
+  });
+
+  // CASE WHEN with an explicit NULL result branch — verify NULL flows through
+  // and is not coerced to a string.
+  const caseNullRes = await run(`
+    SELECT \`id\`,
+      CASE
+        WHEN \`note\` IS NULL THEN NULL
+        WHEN \`note\` = 'vip' THEN 'priority'
+        ELSE 'standard'
+      END AS tier
+    FROM \`orders\`
+    ORDER BY \`id\`;
+  `);
+  assertResult("CASE WHEN with NULL branch preserves NULL", caseNullRes, {
+    columns: ["id", "tier"],
+    rows: [
+      [1, "standard"],
+      [2, null],
+      [3, "priority"],
+      [4, null],
+      [5, "standard"],
+    ],
+  });
+
+  // CASE inside an aggregate — conditional COUNT with GROUP BY tier.
+  const caseAggRes = await run(`
+    SELECT
+      CASE WHEN \`total\` IS NULL THEN 'no_total' ELSE 'has_total' END AS kind,
+      COUNT(*) AS n,
+      SUM(CASE WHEN \`note\` IS NOT NULL THEN 1 ELSE 0 END) AS with_note
+    FROM \`orders\`
+    GROUP BY kind
+    ORDER BY kind;
+  `);
+  assertResult("CASE inside COUNT/SUM aggregates correctly", caseAggRes, {
+    columns: ["kind", "n", "with_note"],
+    rows: [
+      ["has_total", 4, 3],
+      ["no_total", 1, 0],
+    ],
+  });
+
+  // COUNT(DISTINCT expr) — combine DISTINCT with a CASE-derived key.
+  const countDistinctRes = await run(`
+    SELECT COUNT(DISTINCT
+      CASE WHEN \`total\` IS NULL THEN 'unknown'
+           WHEN \`total\` < 50 THEN 'lo'
+           ELSE 'hi' END
+    ) AS bucket_count
+    FROM \`orders\`;
+  `);
+  assertResult("COUNT(DISTINCT CASE ...) counts unique buckets", countDistinctRes, {
+    columns: ["bucket_count"],
+    rows: [[3]],
+  });
+
+  // Verify the UI actually renders the CASE result in the ResultsGrid: use
+  // the runAndRender bridge so the grid rows/columns hit the DOM, then
+  // assert the 'priority' and NULL-italic cells are visible.
+  await page.evaluate(async () => {
+    await window.__wb.runAndRender(
+      "SELECT `id`, CASE WHEN `note` IS NULL THEN NULL WHEN `note` = 'vip' THEN 'priority' ELSE 'standard' END AS tier FROM `orders` ORDER BY `id`;",
+    );
+  });
+  // Tier column header
+  const tierHeaderVisible = await page
+    .locator('[role="row"] >> text=tier')
+    .first()
+    .isVisible()
+    .catch(() => false);
+  const priorityCellVisible = await page
+    .locator('[role="gridcell"] >> text=priority')
+    .first()
+    .isVisible()
+    .catch(() => false);
+  // NULL cells render as italic "NULL" placeholder in ResultsGrid.
+  const nullCellCount = await page.locator('[role="gridcell"] span.italic', { hasText: "NULL" }).count();
+  if (tierHeaderVisible && priorityCellVisible && nullCellCount >= 2) {
+    ok(`ResultsGrid renders CASE output — 'priority' cell + ${nullCellCount} NULL cells visible`);
+  } else {
+    fail(
+      `ResultsGrid did not render CASE output as expected (tierHeader=${tierHeaderVisible}, priorityCell=${priorityCellVisible}, nullCells=${nullCellCount})`,
+    );
+  }
+
+
+
 
 
   // --- 4. SHOW TABLES ------------------------------------------------------
