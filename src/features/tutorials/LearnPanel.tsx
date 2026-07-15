@@ -121,6 +121,10 @@ export function LearnPanel({ onOpenInEditor }: Props) {
           <SyllabusView />
         </TabsContent>
 
+        <TabsContent value="challenges" className="m-0 flex-1 overflow-hidden">
+          <ChallengesPanel onOpenInEditor={onOpenInEditor} />
+        </TabsContent>
+
         <TabsContent value="quizzes" className="m-0 flex-1 overflow-y-auto p-4">
           {domain && <MiniQuiz domainId={domain.id} quiz={domain.miniQuiz} />}
         </TabsContent>
