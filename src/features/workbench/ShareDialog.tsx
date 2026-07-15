@@ -1,6 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, Loader2, Trash2, Share2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -74,6 +84,9 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
   const [creating, setCreating] = useState(false);
   const [shares, setShares] = useState<ShareRow[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmRow, setConfirmRow] = useState<ShareRow | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expiring" | "expired" | "revoked">("all");
+  const [sortKey, setSortKey] = useState<"created-desc" | "expires-asc" | "expires-desc">("created-desc");
 
   useEffect(() => {
     if (open) setTitle(defaultTitle);
@@ -136,11 +149,41 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
     }
   };
 
+  const confirmRevoke = async () => {
+    const row = confirmRow;
+    if (!row) return;
+    setConfirmRow(null);
+    await revoke(row);
+  };
+
   const copy = async (slug: string) => {
     const url = shareUrl(slug);
     await navigator.clipboard.writeText(url).catch(() => {});
     toast.success("Copied", { description: url });
   };
+
+  const visibleShares = useMemo(() => {
+    if (!shares) return null;
+    const now = Date.now();
+    const bucket = (r: ShareRow) => {
+      if (r.revoked) return "revoked";
+      if (r.expires_at && new Date(r.expires_at).getTime() < now) return "expired";
+      if (r.expires_at) {
+        const days = (new Date(r.expires_at).getTime() - now) / 86_400_000;
+        if (days <= 7) return "expiring";
+      }
+      return "active";
+    };
+    const filtered = statusFilter === "all" ? shares : shares.filter((r) => bucket(r) === statusFilter);
+    const expTime = (r: ShareRow) =>
+      r.expires_at ? new Date(r.expires_at).getTime() : Number.POSITIVE_INFINITY;
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortKey === "expires-asc") return expTime(a) - expTime(b);
+      if (sortKey === "expires-desc") return expTime(b) - expTime(a);
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    return sorted;
+  }, [shares, statusFilter, sortKey]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -203,9 +246,37 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
               Your share links
             </h3>
             {shares && (
-              <span className="text-[11px] text-muted-foreground">{shares.length} total</span>
+              <span className="text-[11px] text-muted-foreground">
+                {visibleShares?.length ?? 0} of {shares.length}
+              </span>
             )}
           </div>
+          {shares && shares.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                <SelectTrigger className="h-7 w-auto min-w-[120px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="expiring">Expiring ≤ 7d</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="revoked">Revoked</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as typeof sortKey)}>
+                <SelectTrigger className="h-7 w-auto min-w-[140px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created-desc">Newest first</SelectItem>
+                  <SelectItem value="expires-asc">Expires soonest</SelectItem>
+                  <SelectItem value="expires-desc">Expires latest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="max-h-72 overflow-y-auto rounded border">
             {shares === null ? (
               <div className="flex items-center justify-center p-6 text-xs text-muted-foreground">
@@ -215,9 +286,13 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
               <div className="p-6 text-center text-xs text-muted-foreground">
                 No share links yet.
               </div>
+            ) : visibleShares && visibleShares.length === 0 ? (
+              <div className="p-6 text-center text-xs text-muted-foreground">
+                No links match this filter.
+              </div>
             ) : (
               <ul className="divide-y">
-                {shares.map((r) => {
+                {(visibleShares ?? []).map((r) => {
                   const st = status(r);
                   const tone =
                     st.tone === "ok"
@@ -269,7 +344,7 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
                         variant="ghost"
                         className="h-7 px-2 text-rose-400 hover:text-rose-300"
                         disabled={r.revoked || busyId === r.id}
-                        onClick={() => revoke(r)}
+                        onClick={() => setConfirmRow(r)}
                         aria-label="Revoke link"
                       >
                         {busyId === r.id ? (
@@ -286,6 +361,34 @@ export function ShareDialog({ open, onOpenChange, defaultTitle, sql, engineId }:
           </div>
         </section>
       </DialogContent>
+
+      <AlertDialog open={!!confirmRow} onOpenChange={(v) => !v && setConfirmRow(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke this share link?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRow ? (
+                <>
+                  <span className="font-medium text-foreground">
+                    {confirmRow.title || "Untitled share"}
+                  </span>{" "}
+                  <span className="font-mono text-xs">(/s/{confirmRow.slug})</span> will stop
+                  working immediately for anyone who has the link. This cannot be undone.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRevoke}
+              className="bg-rose-500 text-white hover:bg-rose-600"
+            >
+              Revoke link
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
