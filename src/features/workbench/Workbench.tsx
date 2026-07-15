@@ -22,6 +22,7 @@ import {
   Sun,
   Moon,
   Upload,
+  Terminal,
   User as UserIcon,
   X,
 } from "lucide-react";
