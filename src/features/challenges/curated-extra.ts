@@ -503,7 +503,7 @@ const AMAZON: Challenge[] = [
   }),
   mk({
     id: "co-amazon-03", title: "Amazon · Top 3 products per category",
-    topic: "top-n-per-group", difficulty: "Interview", minutes: 10, xp: 55,
+    topic: "window-functions", difficulty: "Interview", minutes: 10, xp: 55,
     domain: "Retail", company: "Amazon", interviewRound: "Onsite",
     concepts: ["ROW_NUMBER", "PARTITION BY"], tags: ["amazon","top-n"],
     problem: "Return the 3 highest-revenue products in each category (Paid only). Break ties by product name ascending. Columns: category, product_name, revenue, rn.",
