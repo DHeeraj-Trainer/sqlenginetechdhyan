@@ -161,6 +161,97 @@ async function main() {
     ],
   });
 
+  // --- 3b. ORDER BY + LIMIT offset edge cases ------------------------------
+  // Offset 0 with the MySQL two-arg form should behave like a plain LIMIT.
+  const limitOffsetZeroRes = await run(
+    "SELECT `id`, `customer` FROM `orders` ORDER BY `id` LIMIT 0, 3;",
+  );
+  assertResult("LIMIT 0, 3 (offset 0) returns first 3 rows", limitOffsetZeroRes, {
+    columns: ["id", "customer"],
+    rows: [
+      [1, "alice"],
+      [2, "bob"],
+      [3, "carol"],
+    ],
+  });
+
+  // MySQL's `LIMIT n OFFSET m` form should translate identically.
+  const limitOffsetKwRes = await run(
+    "SELECT `id`, `customer` FROM `orders` ORDER BY `id` LIMIT 2 OFFSET 1;",
+  );
+  assertResult("LIMIT 2 OFFSET 1 returns rows 2..3", limitOffsetKwRes, {
+    columns: ["id", "customer"],
+    rows: [
+      [2, "bob"],
+      [3, "carol"],
+    ],
+  });
+
+  // ORDER BY DESC with offset — verify sort applies before slicing.
+  const limitDescRes = await run(
+    "SELECT `id`, `customer` FROM `orders` ORDER BY `id` DESC LIMIT 1, 2;",
+  );
+  assertResult("ORDER BY id DESC LIMIT 1, 2 returns rows 4..3", limitDescRes, {
+    columns: ["id", "customer"],
+    rows: [
+      [4, "dave"],
+      [3, "carol"],
+    ],
+  });
+
+  // Multi-column ORDER BY with LIMIT/OFFSET (NULLs sorted last).
+  const multiOrderRes = await run(
+    "SELECT `customer`, `total` FROM `orders` ORDER BY `total` IS NULL, `total` ASC, `customer` ASC LIMIT 2, 2;",
+  );
+  assertResult("multi-column ORDER BY with LIMIT 2, 2", multiOrderRes, {
+    columns: ["customer", "total"],
+    rows: [
+      ["carol", 42.0],
+      ["erin", 99.99],
+    ],
+  });
+
+  // Large offset past the end of the result set — must return zero rows.
+  const largeOffsetRes = await run(
+    "SELECT `id` FROM `orders` ORDER BY `id` LIMIT 1000, 10;",
+  );
+  {
+    const last = largeOffsetRes.results?.[largeOffsetRes.results.length - 1];
+    if (largeOffsetRes.error) fail(`large offset errored: ${largeOffsetRes.error}`);
+    else if (!last) fail("large offset: no result");
+    else if (last.rows.length !== 0) {
+      fail(`LIMIT 1000, 10 should return 0 rows, got: ${JSON.stringify(last.rows)}`);
+    } else {
+      ok("LIMIT 1000, 10 (offset past end) returns 0 rows");
+    }
+  }
+
+  // Offset exactly at row count boundary — also zero rows.
+  const boundaryOffsetRes = await run(
+    "SELECT `id` FROM `orders` ORDER BY `id` LIMIT 5, 5;",
+  );
+  {
+    const last = boundaryOffsetRes.results?.[boundaryOffsetRes.results.length - 1];
+    if (boundaryOffsetRes.error) fail(`boundary offset errored: ${boundaryOffsetRes.error}`);
+    else if (!last) fail("boundary offset: no result");
+    else if (last.rows.length !== 0) {
+      fail(`LIMIT 5, 5 should return 0 rows, got: ${JSON.stringify(last.rows)}`);
+    } else {
+      ok("LIMIT 5, 5 (offset == row count) returns 0 rows");
+    }
+  }
+
+  // Offset just before the last row — count exceeds remaining, returns tail.
+  const tailOffsetRes = await run(
+    "SELECT `id`, `customer` FROM `orders` ORDER BY `id` LIMIT 4, 10;",
+  );
+  assertResult("LIMIT 4, 10 (count exceeds remaining) returns tail row", tailOffsetRes, {
+    columns: ["id", "customer"],
+    rows: [[5, "erin"]],
+  });
+
+
+
   // --- 4. SHOW TABLES ------------------------------------------------------
   const showRes = await run("SHOW TABLES;");
   if (showRes.error) fail(`SHOW TABLES errored: ${showRes.error}`);
