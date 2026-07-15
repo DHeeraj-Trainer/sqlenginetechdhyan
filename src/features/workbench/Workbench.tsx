@@ -10,6 +10,7 @@ import {
   Clock,
   Database,
   GraduationCap,
+  ShieldCheck,
   History,
   Layers,
   LogIn,
