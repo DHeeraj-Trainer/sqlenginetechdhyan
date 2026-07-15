@@ -252,7 +252,7 @@ export const getSharedQuery = createServerFn({ method: "GET" })
           const h = new Headers(init?.headers);
           if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) h.delete("Authorization");
           h.set("apikey", key);
-          return fetch(input, { ...input, headers: h } as RequestInit);
+          return fetch(input, { ...init, headers: h });
         },
       },
     });
