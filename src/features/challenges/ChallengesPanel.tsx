@@ -39,10 +39,20 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
     saveState(state);
   }, [state]);
 
-  const domains = useMemo(
-    () => Array.from(new Set(CHALLENGES.map((c) => c.domain))).sort(),
-    [],
-  );
+  const domains = useMemo(() => {
+    const ALL = [
+      "Healthcare",
+      "Retail",
+      "Banking",
+      "Education",
+      "E-Commerce",
+      "Hospitality",
+      "Logistics",
+      "Insurance",
+      "Telecommunications",
+    ];
+    return Array.from(new Set([...ALL, ...CHALLENGES.map((c) => c.domain)])).sort();
+  }, []);
 
   const filtered = useMemo(() => {
     const q = filters.q.trim().toLowerCase();
