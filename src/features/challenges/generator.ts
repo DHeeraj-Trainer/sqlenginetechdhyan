@@ -844,8 +844,8 @@ export function generateCompanyChallenges(): Challenge[] {
       const tpl = templates[i % templates.length];
       const domain = DOMAINS[(company.name.length + i) % DOMAINS.length];
       const round = ROUNDS[i % ROUNDS.length];
-      const difficulty: Difficulty = i < 2 ? "Beginner" : i < 4 ? "Intermediate" : "Advanced";
-      const xp = 25 + i * 5;
+      const difficulty: Difficulty = i === 0 ? "Beginner" : i === 1 ? "Intermediate" : "Advanced";
+      const xp = 25 + i * 10;
       const built = build(tpl, domain, {
         id: `${company.id}-${tpl.key}-${i}`,
         number: n++,
