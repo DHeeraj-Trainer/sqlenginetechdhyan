@@ -80,7 +80,7 @@ function tableDescription(t: EnrichedTable): string {
   return parts.length ? parts.join(" · ") : "Database table";
 }
 
-export function TablesExplorer({ onInsertQuery }: Props) {
+export function TablesExplorer({ onInsertQuery, onSendToConsole }: Props) {
   const { catalog, refreshCatalog, status } = useEngine();
   const [search, setSearch] = useState("");
   const [schemaFilter, setSchemaFilter] = useState<string>("all");
