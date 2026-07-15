@@ -42,6 +42,8 @@ export type TopicId =
   | "normalization"
   | "performance";
 
+export type InterviewRound = "Screen" | "Phone" | "Onsite" | "Take-home" | "Final";
+
 export interface Challenge {
   id: string;
   number: number;
@@ -64,10 +66,44 @@ export interface Challenge {
   explanation: string;
   complexity: string;
   conceptsLearned: string[];
+  // Interview-specific (optional)
+  company?: string;
+  interviewRound?: InterviewRound;
+  similarIds?: string[];
+  relatedTopics?: TopicId[];
+  nextId?: string;
 }
 
 export interface Topic {
   id: TopicId;
   label: string;
   order: number;
+}
+
+export interface DomainDef {
+  id: string;
+  label: string;
+  emoji: string;
+  // Three semantic tables per domain: entity, event, item.
+  entity: { name: string; label: string; cols: string; keyCol: string; textCol: string; regionCol: string };
+  event: {
+    name: string;
+    label: string;
+    cols: string;
+    dateCol: string;
+    amountCol: string;
+    statusCol: string;
+    statusValues: string[];
+    entityFk: string;
+    itemFk: string;
+  };
+  item: { name: string; label: string; cols: string; categoryCol: string; priceCol: string; textCol: string };
+}
+
+export interface CompanyDef {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  tier: "FAANG" | "Big Tech" | "Fintech" | "Consumer" | "Enterprise";
 }

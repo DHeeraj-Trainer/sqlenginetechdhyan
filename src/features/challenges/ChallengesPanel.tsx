@@ -5,13 +5,21 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { CHALLENGES } from "./catalog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CHALLENGES } from "./index";
 import { TOPICS } from "./topics";
 import type { Challenge, Difficulty } from "./types";
 import { ChallengeCard } from "./ChallengeCard";
 import { ChallengeDetail } from "./ChallengeDetail";
 import { FiltersBar, type Filters } from "./FiltersBar";
-import { loadState, saveState, toggle, type ChallengeState } from "./storage";
+import { loadState, saveState, toggle, recordSolve, type ChallengeState } from "./storage";
+import { unlockedAchievements, newlyUnlocked, ACHIEVEMENTS } from "./achievements";
+import { computeProgress } from "./progress";
+import { ProgressDashboard } from "./ProgressDashboard";
+import { AchievementsPanel } from "./AchievementsPanel";
+import { DomainBrowser } from "./DomainBrowser";
+import { CompanyBrowser } from "./CompanyBrowser";
+import { toast } from "sonner";
 
 const DIFF_ORDER: Record<Difficulty, number> = {
   Beginner: 1,
@@ -34,27 +42,30 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
     sort: "default",
   });
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"topics" | "domains" | "companies" | "interview" | "progress" | "achievements">("topics");
 
   useEffect(() => {
     saveState(state);
   }, [state]);
 
-  const domains = useMemo(() => {
-    const ALL = [
-      "Healthcare",
-      "Retail",
-      "Banking",
-      "Education",
-      "E-Commerce",
-      "Hospitality",
-      "Logistics",
-      "Insurance",
-      "Telecommunications",
-    ];
-    return Array.from(new Set([...ALL, ...CHALLENGES.map((c) => c.domain)])).sort();
-  }, []);
+  // Auto-award achievements whenever the underlying state changes.
+  useEffect(() => {
+    const next = unlockedAchievements(state, CHALLENGES);
+    const newly = newlyUnlocked(state.achievements, next);
+    if (newly.length === 0 && next.length === state.achievements.length) return;
+    if (newly.length > 0) {
+      for (const a of newly) toast.success(`Achievement unlocked · ${a.icon} ${a.label}`, { description: a.description });
+    }
+    setState((s) => ({ ...s, achievements: next }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.solved.length, state.dailyStreakDays, state.xp]);
 
-  const filtered = useMemo(() => {
+  const domains = useMemo(
+    () => Array.from(new Set(CHALLENGES.map((c) => c.domain))).sort(),
+    [],
+  );
+
+  const filteredAll = useMemo(() => {
     const q = filters.q.trim().toLowerCase();
     let list: Challenge[] = CHALLENGES.filter((c) => {
       if (filters.difficulty !== "all" && c.difficulty !== filters.difficulty) return false;
@@ -64,7 +75,7 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
       if (filters.status === "bookmarked" && !state.bookmarked.includes(c.id)) return false;
       if (filters.status === "favorite" && !state.favorite.includes(c.id)) return false;
       if (q) {
-        const hay = [c.title, ...c.concepts, ...c.tags, c.domain].join(" ").toLowerCase();
+        const hay = [c.title, ...c.concepts, ...c.tags, c.domain, c.company ?? ""].join(" ").toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -80,21 +91,30 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
     return list;
   }, [filters, state]);
 
+  const filteredForTopics = filteredAll;
+
   const byTopic = useMemo(() => {
     const map = new Map<string, Challenge[]>();
-    for (const c of filtered) {
+    for (const c of filteredForTopics) {
       const arr = map.get(c.topic) ?? [];
       arr.push(c);
       map.set(c.topic, arr);
     }
     return map;
-  }, [filtered]);
+  }, [filteredForTopics]);
+
+  const interviewChallenges = useMemo(
+    () => filteredAll.filter((c) => c.difficulty === "Interview" || !!c.company),
+    [filteredAll],
+  );
 
   const active = activeId ? CHALLENGES.find((c) => c.id === activeId) ?? null : null;
   const openTopics = useMemo(
     () => TOPICS.filter((t) => (byTopic.get(t.id)?.length ?? 0) > 0).map((t) => t.id),
     [byTopic],
   );
+
+  const stats = useMemo(() => computeProgress(state, CHALLENGES), [state]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -107,56 +127,137 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
         totalXP={state.xp}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {filtered.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">
-            No challenges match your filters.
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex min-h-0 flex-1 flex-col">
+        <TabsList className="mx-3 mt-2 grid h-8 w-auto grid-cols-6 text-[11px]">
+          <TabsTrigger value="topics" className="text-[11px]">Topics</TabsTrigger>
+          <TabsTrigger value="domains" className="text-[11px]">Domains</TabsTrigger>
+          <TabsTrigger value="companies" className="text-[11px]">Companies</TabsTrigger>
+          <TabsTrigger value="interview" className="text-[11px]">Interview</TabsTrigger>
+          <TabsTrigger value="progress" className="text-[11px]">Progress</TabsTrigger>
+          <TabsTrigger value="achievements" className="text-[11px]">Badges</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="topics" className="min-h-0 flex-1 overflow-y-auto p-3">
+          {filteredForTopics.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              No challenges match your filters.
+            </div>
+          ) : (
+            <Accordion type="multiple" defaultValue={openTopics} className="space-y-2">
+              {TOPICS.map((topic) => {
+                const list = byTopic.get(topic.id);
+                if (!list || list.length === 0) return null;
+                return (
+                  <AccordionItem
+                    key={topic.id}
+                    value={topic.id}
+                    className="overflow-hidden rounded-lg border bg-card/30"
+                  >
+                    <AccordionTrigger className="px-3 py-2 text-sm hover:no-underline">
+                      <div className="flex flex-1 items-center justify-between pr-2">
+                        <span className="font-semibold">{topic.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {list.filter((c) => state.solved.includes(c.id)).length}/{list.length}
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-3 pb-3">
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {list.map((c) => (
+                          <ChallengeCard
+                            key={c.id}
+                            challenge={c}
+                            solved={state.solved.includes(c.id)}
+                            bookmarked={state.bookmarked.includes(c.id)}
+                            favorite={state.favorite.includes(c.id)}
+                            onOpen={() => setActiveId(c.id)}
+                            onToggleBookmark={() =>
+                              setState((s) => ({ ...s, bookmarked: toggle(s.bookmarked, c.id) }))
+                            }
+                            onToggleFavorite={() =>
+                              setState((s) => ({ ...s, favorite: toggle(s.favorite, c.id) }))
+                            }
+                          />
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          )}
+        </TabsContent>
+
+        <TabsContent value="domains" className="min-h-0 flex-1 overflow-y-auto">
+          <DomainBrowser
+            challenges={filteredAll}
+            solvedIds={state.solved}
+            bookmarkedIds={state.bookmarked}
+            favoriteIds={state.favorite}
+            onOpen={(id) => setActiveId(id)}
+            onToggleBookmark={(id) =>
+              setState((s) => ({ ...s, bookmarked: toggle(s.bookmarked, id) }))
+            }
+            onToggleFavorite={(id) =>
+              setState((s) => ({ ...s, favorite: toggle(s.favorite, id) }))
+            }
+          />
+        </TabsContent>
+
+        <TabsContent value="companies" className="min-h-0 flex-1 overflow-y-auto">
+          <CompanyBrowser
+            challenges={filteredAll}
+            solvedIds={state.solved}
+            bookmarkedIds={state.bookmarked}
+            favoriteIds={state.favorite}
+            onOpen={(id) => setActiveId(id)}
+            onToggleBookmark={(id) =>
+              setState((s) => ({ ...s, bookmarked: toggle(s.bookmarked, id) }))
+            }
+            onToggleFavorite={(id) =>
+              setState((s) => ({ ...s, favorite: toggle(s.favorite, id) }))
+            }
+          />
+        </TabsContent>
+
+        <TabsContent value="interview" className="min-h-0 flex-1 overflow-y-auto p-3">
+          {interviewChallenges.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              No interview challenges match your filters.
+            </div>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2">
+              {interviewChallenges.map((c) => (
+                <ChallengeCard
+                  key={c.id}
+                  challenge={c}
+                  solved={state.solved.includes(c.id)}
+                  bookmarked={state.bookmarked.includes(c.id)}
+                  favorite={state.favorite.includes(c.id)}
+                  onOpen={() => setActiveId(c.id)}
+                  onToggleBookmark={() =>
+                    setState((s) => ({ ...s, bookmarked: toggle(s.bookmarked, c.id) }))
+                  }
+                  onToggleFavorite={() =>
+                    setState((s) => ({ ...s, favorite: toggle(s.favorite, c.id) }))
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="progress" className="min-h-0 flex-1 overflow-y-auto">
+          <ProgressDashboard stats={stats} />
+        </TabsContent>
+
+        <TabsContent value="achievements" className="min-h-0 flex-1 overflow-y-auto">
+          <AchievementsPanel unlockedIds={state.achievements.length > 0 ? state.achievements : unlockedAchievements(state, CHALLENGES)} />
+          <div className="px-3 pb-4 text-[10px] text-muted-foreground">
+            {ACHIEVEMENTS.length} total badges available.
           </div>
-        ) : (
-          <Accordion type="multiple" defaultValue={openTopics} className="space-y-2">
-            {TOPICS.map((topic) => {
-              const list = byTopic.get(topic.id);
-              if (!list || list.length === 0) return null;
-              return (
-                <AccordionItem
-                  key={topic.id}
-                  value={topic.id}
-                  className="overflow-hidden rounded-lg border bg-card/30"
-                >
-                  <AccordionTrigger className="px-3 py-2 text-sm hover:no-underline">
-                    <div className="flex flex-1 items-center justify-between pr-2">
-                      <span className="font-semibold">{topic.label}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {list.filter((c) => state.solved.includes(c.id)).length}/{list.length}
-                      </span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-3 pb-3">
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {list.map((c) => (
-                        <ChallengeCard
-                          key={c.id}
-                          challenge={c}
-                          solved={state.solved.includes(c.id)}
-                          bookmarked={state.bookmarked.includes(c.id)}
-                          favorite={state.favorite.includes(c.id)}
-                          onOpen={() => setActiveId(c.id)}
-                          onToggleBookmark={() =>
-                            setState((s) => ({ ...s, bookmarked: toggle(s.bookmarked, c.id) }))
-                          }
-                          onToggleFavorite={() =>
-                            setState((s) => ({ ...s, favorite: toggle(s.favorite, c.id) }))
-                          }
-                        />
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
 
       <ChallengeDetail
         challenge={active}
@@ -165,10 +266,7 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
         onClose={() => setActiveId(null)}
         onSubmitSolved={() => {
           if (!active) return;
-          setState((s) => {
-            if (s.solved.includes(active.id)) return s;
-            return { ...s, solved: [...s.solved, active.id], xp: s.xp + active.xp };
-          });
+          setState((s) => recordSolve(s, active.id, active.xp));
         }}
         onOpenInEditor={onOpenInEditor}
       />
