@@ -388,6 +388,15 @@ function TableCard({
             toast.success("Query inserted");
           }}
         />
+        {onSendToConsole && (
+          <CardBtn
+            icon={<Terminal className="h-3 w-3" />}
+            label="Console"
+            onClick={() => {
+              onSendToConsole(`SELECT * FROM ${qName} LIMIT 100;`);
+            }}
+          />
+        )}
       </div>
     </div>
   );
