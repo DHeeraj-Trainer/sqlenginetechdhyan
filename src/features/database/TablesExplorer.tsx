@@ -1176,6 +1176,16 @@ function SqlPreviewDialog({
                     >
                       Insert
                     </Button>
+                    {onSendToConsole && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => onSendToConsole(s.sql)}
+                      >
+                        <Terminal className="mr-1 h-3 w-3" /> Console
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <pre className="whitespace-pre-wrap p-2 font-mono text-[11px]">{s.sql}</pre>
