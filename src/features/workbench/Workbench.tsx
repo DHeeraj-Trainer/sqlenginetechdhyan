@@ -757,6 +757,7 @@ function SidebarBody({
         <SnippetsList snippets={snippets} onLoad={onLoadNewTab} onDelete={onDeleteSnippet} />
       )}
       {section === "learn" && <LearnPanel onOpenInEditor={(sql) => onOpenLearn(sql)} />}
+      {section === "compat" && <MysqlCompatPanel onInsertQuery={onInsert} />}
     </div>
   );
 }
