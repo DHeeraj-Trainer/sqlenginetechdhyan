@@ -177,11 +177,15 @@ function SignUpForm({ redirectTo }: { redirectTo?: string }) {
       onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);
+        const emailRedirect =
+          redirectTo && redirectTo.startsWith("/")
+            ? window.location.origin + redirectTo
+            : window.location.origin;
         const { error, data } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: emailRedirect,
             data: { full_name: name },
           },
         });
