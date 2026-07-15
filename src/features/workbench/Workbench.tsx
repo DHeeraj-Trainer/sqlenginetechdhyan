@@ -110,6 +110,23 @@ function WorkbenchInner() {
     (window as unknown as { __wb_schema_words?: string[] }).__wb_schema_words = Array.from(new Set(words));
   }, [tables]);
 
+  // E2E test bridge: expose runQuery so authenticated smoke tests can drive
+  // multi-statement SQL through the live engine. Only active when the app
+  // opts in with window.__wbEnableTestBridge = true (set by tests) or when
+  // running against a preview build (import.meta.env.DEV).
+  useEffect(() => {
+    const w = window as unknown as {
+      __wb?: { runQuery: (sql: string) => Promise<unknown>; engineId: string };
+      __wbEnableTestBridge?: boolean;
+    };
+    if (import.meta.env.DEV || w.__wbEnableTestBridge) {
+      w.__wb = { runQuery: (sql: string) => runQuery(sql), engineId };
+    }
+    return () => {
+      if (w.__wb) delete w.__wb;
+    };
+  }, [runQuery, engineId]);
+
   const runActive = useCallback(async () => {
     if (!activeTab) return;
     const sql = activeTab.content;
