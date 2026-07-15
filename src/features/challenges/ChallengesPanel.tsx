@@ -11,7 +11,8 @@ import { TOPICS } from "./topics";
 import type { Challenge, Difficulty } from "./types";
 import { ChallengeCard } from "./ChallengeCard";
 import { ChallengeDetail } from "./ChallengeDetail";
-import { FiltersBar, type Filters } from "./FiltersBar";
+import { FiltersBar, DEFAULT_FILTERS, type Filters } from "./FiltersBar";
+import { COMPANIES } from "./companies";
 import { loadState, saveState, toggle, recordSolve, type ChallengeState } from "./storage";
 import { unlockedAchievements, newlyUnlocked, ACHIEVEMENTS } from "./achievements";
 import { computeProgress } from "./progress";
@@ -34,13 +35,7 @@ interface Props {
 
 export function ChallengesPanel({ onOpenInEditor }: Props) {
   const [state, setState] = useState<ChallengeState>(() => loadState());
-  const [filters, setFilters] = useState<Filters>({
-    q: "",
-    difficulty: "all",
-    status: "all",
-    domain: "all",
-    sort: "default",
-  });
+  const [filters, setFilters] = useState<Filters>(() => ({ ...DEFAULT_FILTERS }));
   const [activeId, setActiveId] = useState<string | null>(null);
   const [tab, setTab] = useState<"topics" | "domains" | "companies" | "interview" | "progress" | "achievements">("topics");
 
@@ -65,17 +60,47 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
     [],
   );
 
+  const companyNames = useMemo(
+    () =>
+      Array.from(
+        new Set(CHALLENGES.map((c) => c.company).filter((x): x is string => !!x)),
+      ).sort(),
+    [],
+  );
+
+  const conceptOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of CHALLENGES) for (const k of c.concepts) s.add(k);
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, []);
+
+  const tierByCompanyName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const co of COMPANIES) m.set(co.name, co.tier);
+    return m;
+  }, []);
+
   const filteredAll = useMemo(() => {
     const q = filters.q.trim().toLowerCase();
+    const conceptQ = filters.concept === "all" ? null : filters.concept.toLowerCase();
     let list: Challenge[] = CHALLENGES.filter((c) => {
       if (filters.difficulty !== "all" && c.difficulty !== filters.difficulty) return false;
       if (filters.domain !== "all" && c.domain !== filters.domain) return false;
+      if (filters.company !== "all" && c.company !== filters.company) return false;
+      if (filters.tier !== "all") {
+        if (!c.company) return false;
+        if (tierByCompanyName.get(c.company) !== filters.tier) return false;
+      }
+      if (conceptQ) {
+        const hit = c.concepts.some((k) => k.toLowerCase() === conceptQ);
+        if (!hit) return false;
+      }
       if (filters.status === "solved" && !state.solved.includes(c.id)) return false;
       if (filters.status === "unsolved" && state.solved.includes(c.id)) return false;
       if (filters.status === "bookmarked" && !state.bookmarked.includes(c.id)) return false;
       if (filters.status === "favorite" && !state.favorite.includes(c.id)) return false;
       if (q) {
-        const hay = [c.title, ...c.concepts, ...c.tags, c.domain, c.company ?? ""].join(" ").toLowerCase();
+        const hay = [c.title, ...c.concepts, ...c.tags, c.domain, c.company ?? "", c.topic].join(" ").toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -89,7 +114,7 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
       list = [...list].sort((a, b) => a.estMinutes - b.estMinutes);
     }
     return list;
-  }, [filters, state]);
+  }, [filters, state, tierByCompanyName]);
 
   const filteredForTopics = filteredAll;
 
@@ -122,9 +147,12 @@ export function ChallengesPanel({ onOpenInEditor }: Props) {
         filters={filters}
         onChange={setFilters}
         domains={domains}
+        companies={companyNames}
+        concepts={conceptOptions}
         totalChallenges={CHALLENGES.length}
         totalSolved={state.solved.length}
         totalXP={state.xp}
+        matchCount={filteredAll.length}
       />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex min-h-0 flex-1 flex-col">
