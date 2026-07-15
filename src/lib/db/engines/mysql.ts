@@ -1,45 +1,64 @@
 import { SqliteEngine } from "./sqlite";
 import type { EngineId, QueryResult } from "@/types/workbench";
+import { buildMysqlDiagnostic, encodeDiagnostic } from "./mysql-diagnostics";
 
 /**
  * In-browser MySQL emulation.
  *
  * Runs a real SQLite (sql.js) engine under the hood and preprocesses MySQL
- * dialect into SQLite before every exec/loadScript. Handles the common
- * differences shown in tutorials and interview prep material:
- *
- * - backticks -> double quotes for identifiers
- * - `AUTO_INCREMENT` -> `AUTOINCREMENT`
- * - `ENGINE=...`, `DEFAULT CHARSET=...`, `COLLATE=...` table options stripped
- * - `UNSIGNED`, `ZEROFILL` type modifiers stripped
- * - `TINYINT(1)/INT/BIGINT/MEDIUMINT/SMALLINT` -> `INTEGER`
- * - `DOUBLE/FLOAT/DECIMAL(x,y)` -> `REAL`
- * - `DATETIME/TIMESTAMP/DATE/TIME/YEAR` -> `TEXT`
- * - `VARCHAR(n)/CHAR(n)/TEXT/LONGTEXT/MEDIUMTEXT/TINYTEXT` -> `TEXT`
- * - `LIMIT x, y` -> `LIMIT y OFFSET x`
- * - `IFNULL(a,b)` -> `COALESCE(a,b)`
- * - `NOW()/CURDATE()/CURTIME()` -> SQLite equivalents
- * - `CONCAT(a,b,c...)` -> `a || b || c`
- * - MySQL `#` line comments -> `--`
- * - `USE db;`, `SET ...;`, `SHOW WARNINGS` -> no-op
- * - `SHOW TABLES` / `SHOW DATABASES` / `DESCRIBE t` -> equivalent SQLite queries
- *
- * This is an emulation, not a full MySQL server: stored procedures, MySQL-only
- * functions (JSON_*, GROUP_CONCAT with SEPARATOR), and some edge cases will not
- * behave exactly like MySQL. Users who need 100% fidelity should connect a real
- * MySQL server.
+ * dialect into SQLite before every exec/loadScript. See translateMysql() for
+ * the full list of rewrites. When SQLite rejects a translated statement the
+ * engine attaches a structured diagnostic (original SQL, translated SQL,
+ * reason, suggestion) via encodeDiagnostic so the UI can render it.
  */
 export class MysqlEmulationEngine extends SqliteEngine {
   readonly id: EngineId = "mysql";
   readonly label = "MySQL (emulated)";
 
   async exec(sql: string): Promise<QueryResult[]> {
-    return super.exec(translateMysql(sql));
+    const statements = splitTopLevel(sql);
+    const results: QueryResult[] = [];
+    for (const stmt of statements) {
+      if (!stmt.trim()) continue;
+      const translated = translateMysql(stmt);
+      try {
+        const r = await super.exec(translated);
+        for (const one of r) results.push(one);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        const diag = buildMysqlDiagnostic(stmt.trim(), translated.trim(), msg);
+        throw new Error(encodeDiagnostic(diag) + msg);
+      }
+    }
+    return results;
   }
 
   async loadScript(sql: string): Promise<void> {
     return super.loadScript(translateMysql(sql));
   }
+}
+
+/** Minimal statement splitter that is quote-aware; keeps semicolons out of strings. */
+function splitTopLevel(sql: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let s = false;
+  let d = false;
+  let b = false;
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i];
+    if (!d && !b && c === "'" && sql[i - 1] !== "\\") s = !s;
+    else if (!s && !b && c === '"' && sql[i - 1] !== "\\") d = !d;
+    else if (!s && !d && c === "`") b = !b;
+    if (c === ";" && !s && !d && !b) {
+      out.push(cur + ";");
+      cur = "";
+      continue;
+    }
+    cur += c;
+  }
+  if (cur.trim()) out.push(cur);
+  return out;
 }
 
 /**
