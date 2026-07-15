@@ -736,7 +736,19 @@ SELECT ROUND(100.0 * (SELECT COUNT(*) FROM w2) / (SELECT COUNT(*) FROM first_eve
   }),
 ];
 
-/** Companies rotate through interview-tier templates. */
+/**
+ * Curated seed templates used for the domain browser (4 per domain).
+ * Chosen to span the beginner → intermediate → advanced arc so every
+ * domain has a self-contained learning slice out of the box.
+ */
+const SEED_TEMPLATE_KEYS = [
+  "list-all",         // SELECT / projection — beginner
+  "count",            // aggregate — beginner→intermediate
+  "group-by",         // GROUP BY — intermediate
+  "top-n-per-group",  // window function — advanced
+];
+
+/** Companies rotate through interview-tier templates (3 per company). */
 const INTERVIEW_TEMPLATE_KEYS = [
   "second-highest",
   "duplicates",
@@ -788,13 +800,18 @@ ${domain.item.name}(${domain.item.cols})`,
 }
 
 /**
- * Generate every domain × every template. Around 22 × 25 ≈ 550 challenges.
+ * Generate a curated seed slice: SEED_TEMPLATE_KEYS × every domain.
+ * 22 domains × 4 templates = 88 domain challenges. Content grows
+ * incrementally by adding template keys to SEED_TEMPLATE_KEYS.
  */
 export function generateDomainChallenges(): Challenge[] {
   counter = 0;
   const out: Challenge[] = [];
+  const seedTemplates = SEED_TEMPLATE_KEYS
+    .map((k) => TEMPLATES.find((t) => t.key === k))
+    .filter((t): t is Template => Boolean(t));
   for (const d of DOMAINS) {
-    for (const t of TEMPLATES) {
+    for (const t of seedTemplates) {
       out.push(build(t, d));
     }
   }
@@ -814,20 +831,21 @@ export function generateDomainChallenges(): Challenge[] {
 const ROUNDS: InterviewRound[] = ["Screen", "Phone", "Onsite", "Take-home", "Final"];
 
 /**
- * Generate 6 interview questions per company (2 Easy, 2 Medium, 2 Hard) using
- * interview templates cycled across domains. 20 × 6 = 120 challenges.
+ * Generate 3 seed interview questions per company (Beginner / Intermediate /
+ * Advanced) cycled across domains. 20 × 3 = 60 challenges.
  */
 export function generateCompanyChallenges(): Challenge[] {
   const list: Challenge[] = [];
   let n = 10_000; // separate namespace
+  const SEED_COUNT = 3;
   for (const company of COMPANIES) {
     const templates = INTERVIEW_TEMPLATE_KEYS.map((k) => TEMPLATES.find((t) => t.key === k)!).filter(Boolean);
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < SEED_COUNT; i++) {
       const tpl = templates[i % templates.length];
       const domain = DOMAINS[(company.name.length + i) % DOMAINS.length];
       const round = ROUNDS[i % ROUNDS.length];
-      const difficulty: Difficulty = i < 2 ? "Beginner" : i < 4 ? "Intermediate" : "Advanced";
-      const xp = 25 + i * 5;
+      const difficulty: Difficulty = i === 0 ? "Beginner" : i === 1 ? "Intermediate" : "Advanced";
+      const xp = 25 + i * 10;
       const built = build(tpl, domain, {
         id: `${company.id}-${tpl.key}-${i}`,
         number: n++,
