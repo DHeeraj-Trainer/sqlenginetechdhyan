@@ -10,6 +10,7 @@ import {
   Clock,
   Database,
   GraduationCap,
+  ShieldCheck,
   History,
   Layers,
   LogIn,
@@ -45,6 +46,7 @@ import { MysqlConnectDialog } from "@/features/workbench/MysqlConnectDialog";
 import type { StoredMysqlConnection } from "@/lib/mysql-live.functions";
 import { AiTutorPanel } from "@/features/ai/AiTutorPanel";
 import { LearnPanel } from "@/features/tutorials/LearnPanel";
+import { MysqlCompatPanel } from "@/features/workbench/MysqlCompatPanel";
 import {
   useEditorTabs,
   useQueryHistory,
@@ -59,7 +61,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { ShareDialog } from "@/features/workbench/ShareDialog";
 
 
-type SidebarSection = "database" | "tables" | "history" | "snippets" | "learn";
+type SidebarSection = "database" | "tables" | "history" | "snippets" | "learn" | "compat";
 
 const SIDEBAR_LABEL: Record<SidebarSection, string> = {
   database: "Database explorer",
@@ -67,6 +69,7 @@ const SIDEBAR_LABEL: Record<SidebarSection, string> = {
   history: "Query history",
   snippets: "Saved snippets",
   learn: "Learn",
+  compat: "MySQL compatibility",
 };
 
 export function Workbench() {
@@ -673,6 +676,7 @@ function SidebarRail({
     { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
     { id: "snippets", label: "Snippets", icon: <Bookmark className="h-4 w-4" /> },
     { id: "learn", label: "Learn", icon: <GraduationCap className="h-4 w-4" /> },
+    { id: "compat", label: "MySQL compatibility", icon: <ShieldCheck className="h-4 w-4" /> },
   ];
   return (
     <nav
@@ -753,6 +757,7 @@ function SidebarBody({
         <SnippetsList snippets={snippets} onLoad={onLoadNewTab} onDelete={onDeleteSnippet} />
       )}
       {section === "learn" && <LearnPanel onOpenInEditor={(sql) => onOpenLearn(sql)} />}
+      {section === "compat" && <MysqlCompatPanel onInsertQuery={onInsert} />}
     </div>
   );
 }
