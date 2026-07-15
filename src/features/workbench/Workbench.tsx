@@ -591,38 +591,66 @@ function EngineSwitcher({ engineId, onSwitch }: { engineId: EngineId; onSwitch: 
     postgres: "PostgreSQL (PGlite)",
     alasql: "AlaSQL",
     mysql: "MySQL (emulated)",
+    "mysql-live": "MySQL (live)",
   };
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const { engine } = useEngine();
+  const [activeConnId, setActiveConnId] = useState<string | null>(() => {
+    if (engine && engine.id === "mysql-live") {
+      return (engine as unknown as { getConnection?: () => { id: string } | null }).getConnection?.()?.id ?? null;
+    }
+    return null;
+  });
+  useEffect(() => {
+    if (engine && engine.id === "mysql-live") {
+      const c = (engine as unknown as { getConnection?: () => { id: string } | null }).getConnection?.();
+      setActiveConnId(c?.id ?? null);
+    } else {
+      setActiveConnId(null);
+    }
+  }, [engine]);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="sm" variant="outline" className="h-8">
-          <Layers className="mr-1 h-3.5 w-3.5" />
-          {labels[engineId]}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuLabel>SQL engine</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {(["sqlite", "postgres", "alasql", "mysql"] as EngineId[]).map((id) => (
-          <DropdownMenuItem key={id} onClick={() => void onSwitch(id)}>
-            {labels[id]} {engineId === id && "✓"}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="outline" className="h-8">
+            <Layers className="mr-1 h-3.5 w-3.5" />
+            {labels[engineId]}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuLabel>SQL engine</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {(["sqlite", "postgres", "alasql", "mysql"] as EngineId[]).map((id) => (
+            <DropdownMenuItem key={id} onClick={() => void onSwitch(id)}>
+              {labels[id]} {engineId === id && "✓"}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setDialogOpen(true)}>
+            Connect MySQL server… {engineId === "mysql-live" && "✓"}
           </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() =>
-            toast.info("Connect a real MySQL server", {
-              description:
-                "The in-browser MySQL emulator covers standard tutorial and interview SQL. To run against a real MySQL host, add MYSQL_HOST/PORT/USER/PASSWORD/DATABASE as project secrets — a server proxy can then execute your queries.",
-              duration: 8000,
-            })
-          }
-        >
-          Connect MySQL server…
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <MysqlConnectDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        activeConnectionId={activeConnId}
+        onActivate={async (conn) => {
+          await onSwitch("mysql-live");
+          // After the engine switches, wire the connection onto it.
+          const inst = (window as unknown as { __wb?: { engine?: unknown } }).__wb?.engine as
+            | { setConnection?: (c: unknown) => void }
+            | undefined;
+          inst?.setConnection?.(conn);
+          setActiveConnId(conn.id);
+        }}
+        onDisconnect={() => setActiveConnId(null)}
+      />
+    </>
   );
+}
+
 }
 
 function SidebarRail({
