@@ -24,6 +24,7 @@ import {
   RefreshCcw,
   Search,
   Table2,
+  Terminal,
   X,
   ZoomIn,
 } from "lucide-react";
@@ -54,6 +55,7 @@ import type {
 
 interface Props {
   onInsertQuery: (sql: string) => void;
+  onSendToConsole?: (sql: string) => void;
 }
 
 type ModalState =
@@ -79,7 +81,7 @@ function tableDescription(t: EnrichedTable): string {
   return parts.length ? parts.join(" · ") : "Database table";
 }
 
-export function TablesExplorer({ onInsertQuery }: Props) {
+export function TablesExplorer({ onInsertQuery, onSendToConsole }: Props) {
   const { catalog, refreshCatalog, status } = useEngine();
   const [search, setSearch] = useState("");
   const [schemaFilter, setSchemaFilter] = useState<string>("all");
@@ -212,6 +214,7 @@ export function TablesExplorer({ onInsertQuery }: Props) {
                 allTables={allTables}
                 openModal={openModal}
                 onInsertQuery={onInsertQuery}
+                onSendToConsole={onSendToConsole}
               />
             ))}
           </div>
@@ -243,6 +246,14 @@ export function TablesExplorer({ onInsertQuery }: Props) {
             onInsertQuery(sql);
             closeModal();
           }}
+          onSendToConsole={
+            onSendToConsole
+              ? (sql) => {
+                  onSendToConsole(sql);
+                  closeModal();
+                }
+              : undefined
+          }
         />
       )}
       {modal?.kind === "er" && (
@@ -265,11 +276,13 @@ function TableCard({
   allTables,
   openModal,
   onInsertQuery,
+  onSendToConsole,
 }: {
   table: EnrichedTable;
   allTables: EnrichedTable[];
   openModal: (m: ModalState) => void;
   onInsertQuery: (sql: string) => void;
+  onSendToConsole?: (sql: string) => void;
 }) {
   const inbound = useMemo(
     () =>
@@ -375,6 +388,15 @@ function TableCard({
             toast.success("Query inserted");
           }}
         />
+        {onSendToConsole && (
+          <CardBtn
+            icon={<Terminal className="h-3 w-3" />}
+            label="Console"
+            onClick={() => {
+              onSendToConsole(`SELECT * FROM ${qName} LIMIT 100;`);
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -1077,10 +1099,12 @@ function SqlPreviewDialog({
   table,
   onClose,
   onInsert,
+  onSendToConsole,
 }: {
   table: EnrichedTable;
   onClose: () => void;
   onInsert: (sql: string) => void;
+  onSendToConsole?: (sql: string) => void;
 }) {
   const qName = q(table.schema, table.name);
   const snippets: { label: string; sql: string }[] = [
@@ -1152,6 +1176,16 @@ function SqlPreviewDialog({
                     >
                       Insert
                     </Button>
+                    {onSendToConsole && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => onSendToConsole(s.sql)}
+                      >
+                        <Terminal className="mr-1 h-3 w-3" /> Console
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <pre className="whitespace-pre-wrap p-2 font-mono text-[11px]">{s.sql}</pre>

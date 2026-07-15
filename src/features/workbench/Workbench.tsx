@@ -22,6 +22,7 @@ import {
   Sun,
   Moon,
   Upload,
+  Terminal,
   User as UserIcon,
   X,
 } from "lucide-react";
@@ -47,6 +48,7 @@ import type { StoredMysqlConnection } from "@/lib/mysql-live.functions";
 import { AiTutorPanel } from "@/features/ai/AiTutorPanel";
 import { LearnPanel } from "@/features/tutorials/LearnPanel";
 import { MysqlCompatPanel } from "@/features/workbench/MysqlCompatPanel";
+import { SqlConsole } from "@/features/workbench/SqlConsole";
 import { extractDiagnostic, MYSQL_DIAG_MARKER, type MysqlDiagnostic } from "@/lib/db/engines/mysql-diagnostics";
 import {
   useEditorTabs,
@@ -62,11 +64,12 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { ShareDialog } from "@/features/workbench/ShareDialog";
 
 
-type SidebarSection = "database" | "tables" | "history" | "snippets" | "learn" | "compat";
+type SidebarSection = "database" | "tables" | "console" | "history" | "snippets" | "learn" | "compat";
 
 const SIDEBAR_LABEL: Record<SidebarSection, string> = {
   database: "Database explorer",
   tables: "Tables",
+  console: "SQL console",
   history: "Query history",
   snippets: "Saved snippets",
   learn: "Learn",
@@ -96,6 +99,17 @@ function WorkbenchInner() {
   const [activeResultIdx, setActiveResultIdx] = useState(0);
   const [lastQuery, setLastQuery] = useState("");
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const [consolePrefill, setConsolePrefill] = useState<{ sql: string; v: number } | null>(null);
+
+  const sendToConsole = useCallback(
+    (sql: string) => {
+      setConsolePrefill({ sql, v: Date.now() });
+      setSidebar("console");
+      if (isMobile) setMobileSidebarOpen(true);
+      else if (!sidebarOpen) setSidebarOpen(true);
+    },
+    [isMobile, sidebarOpen, setSidebarOpen],
+  );
 
   const { tabs, activeId, setActiveId, openNewTab, updateContent, closeTab } = useEditorTabs();
   const { history, push: pushHistory, clear: clearHistory } = useQueryHistory();
@@ -307,6 +321,8 @@ function WorkbenchInner() {
                       onClearHistory={clearHistory}
                       onDeleteSnippet={removeSnippet}
                       onOpenLearn={(sql) => openNewTab(sql)}
+                      onSendToConsole={sendToConsole}
+                      consolePrefill={consolePrefill}
                     />
                   </div>
                 </aside>
@@ -445,6 +461,8 @@ function WorkbenchInner() {
                 openNewTab(sql);
                 setMobileSidebarOpen(false);
               }}
+              onSendToConsole={sendToConsole}
+              consolePrefill={consolePrefill}
             />
           </div>
         </SheetContent>
@@ -675,6 +693,7 @@ function SidebarRail({
   const items: { id: SidebarSection; label: string; icon: React.ReactNode }[] = [
     { id: "database", label: "Database", icon: <Database className="h-4 w-4" /> },
     { id: "tables", label: "Tables", icon: <Layers className="h-4 w-4" /> },
+    { id: "console", label: "SQL console", icon: <Terminal className="h-4 w-4" /> },
     { id: "history", label: "History", icon: <History className="h-4 w-4" /> },
     { id: "snippets", label: "Snippets", icon: <Bookmark className="h-4 w-4" /> },
     { id: "learn", label: "Learn", icon: <GraduationCap className="h-4 w-4" /> },
@@ -733,6 +752,8 @@ function SidebarBody({
   onClearHistory,
   onDeleteSnippet,
   onOpenLearn,
+  onSendToConsole,
+  consolePrefill,
 }: {
   section: SidebarSection;
   history: ReturnType<typeof useQueryHistory>["history"];
@@ -742,6 +763,8 @@ function SidebarBody({
   onClearHistory: () => void;
   onDeleteSnippet: (id: string) => void;
   onOpenLearn: (sql: string) => void;
+  onSendToConsole: (sql: string) => void;
+  consolePrefill: { sql: string; v: number } | null;
 }) {
   return (
     <div
@@ -751,7 +774,12 @@ function SidebarBody({
       className="h-full"
     >
       {section === "database" && <DatabaseExplorer onInsertQuery={onInsert} />}
-      {section === "tables" && <TablesExplorer onInsertQuery={onInsert} />}
+      {section === "tables" && (
+        <TablesExplorer onInsertQuery={onInsert} onSendToConsole={onSendToConsole} />
+      )}
+      {section === "console" && (
+        <SqlConsole prefill={consolePrefill} onOpenInEditor={(sql) => onLoadNewTab(sql)} />
+      )}
       {section === "history" && (
         <HistoryList history={history} onLoad={onLoadNewTab} onClear={onClearHistory} />
       )}
