@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import type { EngineId } from "@/lib/db/engines/types";
+import type { EngineId } from "@/types/workbench";
 
 interface ShareRow {
   id: string;
