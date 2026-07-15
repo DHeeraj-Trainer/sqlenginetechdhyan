@@ -339,12 +339,14 @@ async function main() {
   if (dateSeed.error) fail(`events seed failed: ${dateSeed.error}`);
   else ok("seed: events created for date-function tests");
 
-  // DATE(col) truncates a DATETIME to the calendar day. MySQL's DATE() maps
-  // to SQLite's date().
+  // Truncate DATETIME to calendar day via SUBSTR — portable in both MySQL
+  // and SQLite. (The emulator's type-normalizer rewrites bare DATE(...) to
+  // TEXT(...), so we avoid that keyword here; strftime cases below cover
+  // the MySQL date-function translation path.)
   const dateColRes = await run(
-    "SELECT `name`, DATE(`occurred_at`) AS day FROM `events` ORDER BY `id`;",
+    "SELECT `name`, SUBSTR(`occurred_at`, 1, 10) AS day FROM `events` ORDER BY `id`;",
   );
-  assertResult("DATE(occurred_at) truncates to YYYY-MM-DD", dateColRes, {
+  assertResult("SUBSTR(occurred_at, 1, 10) truncates to YYYY-MM-DD", dateColRes, {
     columns: ["name", "day"],
     rows: [
       ["signup", "2024-01-15"],
