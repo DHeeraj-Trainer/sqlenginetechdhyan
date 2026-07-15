@@ -1,72 +1,155 @@
-# Plan: 4 workstreams
+# Redesigned Challenges Section — LeetCode SQL-style
 
-Each is independent — I'll ship them in one pass but they can be reviewed separately.
+## Scope
 
-## 1. Workbench autosave + signed share links
+Replace the current flat challenge list inside `LearnPanel.tsx` with a topic-organized, filterable, searchable challenge browser plus a detailed challenge view. Keep the existing dark theme and Workbench layout.
 
-**Autosave**
-- New serverFn `saveWorkbenchTabs` (uses `requireSupabaseAuth`) writes to existing `workbench_tabs` (user_id, tab_id, title, sql, cursor, updated_at).
-- `Workbench.tsx` debounces (1s idle) and calls autosave on every tab/SQL change. Load hydrates from `workbench_tabs` on mount, falls back to `workbench-storage` localStorage.
-- Visual "Saved · Xs ago" indicator in the toolbar.
+## Data model (new)
 
-**Signed share links**
-- Extend `shared_queries` with `token` (random 32-byte hex, unique), `expires_at`, `revoked`. Migration adds columns + index.
-- ServerFn `createShareLink({ sql, title, ttlHours })` — inserts row, returns `/s/<token>`.
-- Update `s.$slug.tsx` (or new `s.$token`) loader to look up by token, check expiry/revoked, 404 otherwise. Public `TO anon` SELECT policy scoped `WHERE revoked=false AND (expires_at IS NULL OR expires_at > now()) AND token = current_setting(...)` — simpler: keep policy `revoked=false AND expiry check`, filter by token in query.
-- "Share" button in Workbench → dialog with TTL picker (1h / 24h / 7d / never), copy link + revoke button.
-- Owner list under `/admin` (or user settings) to revoke.
+Create `src/features/challenges/catalog.ts` — a static catalog of ~40 SQL topics with challenges. Each challenge:
 
-## 2. Admin audit — search + CSV export
-
-- `/admin/audit` gains: text search (action, target, user email), date range, action-type filter, pagination.
-- All filtering server-side via new serverFn `listAuditLogs({ q, from, to, action, limit, cursor })` under `requireSupabaseAuth` + `has_role('admin')`.
-- "Export CSV" button calls serverFn `exportAuditLogs(filters)` returning a CSV string; client triggers download. Streaming not needed at expected volumes; hard cap 50k rows with warning.
-
-## 3. Multi-result harness
-
-- `ResultsGrid.tsx` currently shows one tab. Refactor engines (`sqlite.ts`, `postgres.ts`, `alasql.ts`) to always return `Array<ResultSet>` where each statement's result is a set. Update `sql-router` to preserve statement boundaries.
-- Grid renders shadcn `<Tabs>` — one per result set, labeled by statement fragment (first 40 chars of `SELECT ...` / `CREATE TRIGGER ...` etc.). Empty side-effect statements show "OK · N rows affected".
-- For triggers: also fetch trigger metadata + fire-log table after execution, appended as an extra tab.
-- Update `tests/e2e/smoke.spec.mjs` to run a fixture with GROUP BY + HAVING + trigger and assert every tab label is present in DOM.
-
-## 4. OAuth consent page polish
-
-- `src/routes/[.]lovable.oauth.consent.tsx`: replace bare page with:
-  - App logo + name header, requesting client name + redirect origin.
-  - Scope list rendered from the incoming `scope` param, each with a plain-language description (map: `read:snippets` → "View your saved SQL snippets", etc.).
-  - "Allow" primary button, "Deny" secondary button.
-  - Deny flow: post-back to Supabase's OAuth deny endpoint (`/authorize?...&decision=deny`) or 302 to `redirect_uri` with `?error=access_denied&state=...` per RFC 6749. Whichever path Supabase's managed OAuth server accepts — will verify with `supabase--debug_oauth_server`.
-  - "Signed in as <email>" + switch-account link.
-
-## Technical notes
-
-**Migration** (workstream 1):
-```sql
-ALTER TABLE public.shared_queries
-  ADD COLUMN IF NOT EXISTS token text UNIQUE,
-  ADD COLUMN IF NOT EXISTS expires_at timestamptz,
-  ADD COLUMN IF NOT EXISTS revoked boolean NOT NULL DEFAULT false;
-CREATE INDEX IF NOT EXISTS shared_queries_token_idx ON public.shared_queries(token) WHERE revoked=false;
+```ts
+type Challenge = {
+  id: string;              // "sel-01"
+  number: number;          // display #
+  title: string;
+  topic: TopicId;          // "select-basics" | "where-filtering" | ...
+  difficulty: "Beginner" | "Intermediate" | "Advanced" | "Interview";
+  estMinutes: number;
+  xp: number;
+  concepts: string[];      // ["SELECT", "WHERE"]
+  tags: string[];
+  domain: string;          // "E-Commerce" | "Healthcare" | ...
+  problem: string;         // markdown
+  dbDescription: string;
+  sampleInput: string;     // SQL or table markdown
+  expectedOutput: string;
+  starterSql: string;
+  hints: [string, string]; // hint 1, hint 2
+  solution: string;
+  altSolution?: string;
+  explanation: string;
+  complexity: string;
+  conceptsLearned: string[];
+};
 ```
-Existing rows get a backfill token via `gen_random_bytes(16)`.
 
-**Engines refactor** (workstream 3) is the riskiest — I'll keep the single-result path as a fallback so existing callers don't break, and layer multi-result behind a new `runAll()` method the grid opts into.
+Ship an initial curated set (~60-80 challenges) spanning all 40 topics listed by the user. Existing generated advanced challenges stay untouched — this catalog lives alongside them under a new tab.
 
-**Files touched (approx)**:
-- `supabase/migrations/*` (1 new)
-- `src/lib/workbench.functions.ts`, `src/features/workbench/Workbench.tsx`, `src/features/workbench/workbench-storage.ts`
-- `src/lib/admin.functions.ts`, `src/routes/_authenticated/admin.audit.tsx`
-- `src/lib/db/engines/*.ts`, `src/lib/db/sql-router.ts`, `src/features/database/ResultsGrid.tsx`
-- `src/routes/[.]lovable.oauth.consent.tsx`
-- `tests/e2e/smoke.spec.mjs`
+User state (bookmarks, favorites, solved) persists to `localStorage` under `sqlwb:challenges:v1` — no backend changes.
 
-## Order of execution
+## UI
 
-1. Migration (share links + any audit indexes)
-2. Workstream 1 (autosave + share)
-3. Workstream 2 (audit search/CSV)
-4. Workstream 3 (multi-result harness)
-5. Workstream 4 (consent UI)
-6. Regenerate route tree, run `build:dev`, run smoke tests.
+### New tab in LearnPanel: "Challenges"
 
-Confirm and I'll build straight through, or tell me to trim (e.g. defer the consent polish or the engines refactor to a follow-up).
+Replaces the current Challenges area inside the Domains tab (kept for the domain-driven flow) with a dedicated top-level tab so both flows coexist.
+
+```
+[Domains] [Docs] [Syllabus] [Challenges] [Quiz]
+```
+
+### Challenges layout
+
+```
+┌─────────────────────────────────────────────────┐
+│ Sticky bar: 🔍 Search…    [Difficulty ▾] [Topic▾]│
+│              [Status ▾] [Domain ▾] [Sort ▾]      │
+├─────────────────────────────────────────────────┤
+│ Progress: 12/78 solved · 340 XP                 │
+├─────────────────────────────────────────────────┤
+│ ▾ SELECT Basics (4)                             │
+│   ┌───────────────────────────────────────────┐ │
+│   │ #1 Retrieve all users · 🟢 Beginner · 5m  │ │
+│   │ 10 XP · SELECT, FROM · [★] [🔖] ✅        │ │
+│   └───────────────────────────────────────────┘ │
+│ ▸ WHERE & Filtering (6)                         │
+│ ▸ ORDER BY (3)                                  │
+│  …                                              │
+└─────────────────────────────────────────────────┘
+```
+
+- Radix `Accordion` (already in shadcn) with `data-[state=open]:animate-accordion-down`.
+- Difficulty badges — colored: green / yellow / orange / red (`bg-emerald-500/15 text-emerald-400`, etc.).
+- Cards have hover-scale + subtle border glow on hover.
+- Solved cards get a green left-border and check icon.
+- Empty topics hidden after filtering.
+
+### Challenge detail (in-panel drawer)
+
+Opening a challenge slides in a full-panel view (Radix `Sheet` from right, `w-full`):
+
+```
+[← Back]  #7 Filter active users     🟢 Beginner · 15 XP · 8m
+
+Tabs: [Problem] [Editor] [Hints] [Solution] [Explanation]
+
+Problem tab:
+  Problem statement (markdown)
+  Database description
+  Sample input (rendered table)
+  Expected output (rendered table)
+
+Editor tab:
+  Monaco/textarea SQL editor (reuse existing)
+  [Run] [Verify] [Submit]  — runs against active engine
+  Results grid below
+
+Hints tab:
+  Locked: [Reveal Hint 1] → [Reveal Hint 2]
+
+Solution tab:
+  Primary solution + optional alternative
+  "Open in editor" button
+
+Explanation tab:
+  Explanation prose
+  Complexity note
+  Concepts learned chips
+```
+
+Run/Verify/Submit call into the existing engine hook (`useEngine`) using the same shape as current LearnPanel challenge verification. Submit sets `solved=true` in local state and awards XP.
+
+## Filters & search
+
+Sticky top bar, `position: sticky; top: 0; z-index: 10; backdrop-blur`.
+
+- Search: title + concepts + tags (case-insensitive substring).
+- Difficulty: multi-select (Beginner / Intermediate / Advanced / Interview).
+- Topic: multi-select of the 40 topics.
+- Status: All / Solved / Unsolved / Bookmarked / Favorite.
+- Domain: multi-select from catalog domains.
+- Sort: Default / Difficulty asc / XP desc / Est. time asc.
+
+Filter state lives in component state (not URL) to keep scope contained.
+
+## Files
+
+New:
+- `src/features/challenges/types.ts`
+- `src/features/challenges/catalog.ts` (data)
+- `src/features/challenges/topics.ts` (topic metadata: id, label, icon, order)
+- `src/features/challenges/storage.ts` (localStorage read/write for solved/bookmark/favorite)
+- `src/features/challenges/ChallengesPanel.tsx` (list + filters + accordion)
+- `src/features/challenges/ChallengeCard.tsx`
+- `src/features/challenges/ChallengeDetail.tsx` (Sheet content with tabs)
+- `src/features/challenges/DifficultyBadge.tsx`
+- `src/features/challenges/FiltersBar.tsx`
+
+Edited:
+- `src/features/tutorials/LearnPanel.tsx` — add `Challenges` tab that mounts `<ChallengesPanel onOpenInEditor={...} />`.
+
+No route changes, no server function changes, no DB migration.
+
+## Verification
+
+- `bun run build:dev` — clean typecheck + build.
+- Manual: open Challenges tab → accordion expands, search narrows list, filters combine, difficulty badges render correct color, detail sheet opens, Run/Verify wire to engine, Bookmark/Favorite persist across reload.
+
+## Out of scope (call out to user)
+
+- Server-persisted progress (currently localStorage-only).
+- Monaco upgrade in the detail editor (uses same editor primitive as current LearnPanel).
+- New backend tables for XP leaderboard.
+- Actual authoring of 300+ challenges — initial catalog ships ~60-80 curated; more can be added incrementally to `catalog.ts`.
+
+Say the word and I'll build it.

@@ -1,11 +1,12 @@
 // @ts-nocheck
 import { useMemo, useState } from "react";
-import { ArrowRight, BookOpen, CheckCircle2, ChevronRight, Eye, EyeOff, GraduationCap, HelpCircle, Loader2, Lock, Play } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, ChevronRight, Eye, EyeOff, GraduationCap, HelpCircle, Loader2, Lock, Play, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getLegacyDomains, getLegacyChapters, legacySyllabus } from "./legacy-adapter";
 import { useEngine } from "@/lib/db/engine-provider";
 import { toast } from "sonner";
+import { ChallengesPanel } from "@/features/challenges/ChallengesPanel";
 
 interface Props {
   onOpenInEditor: (sql: string, filename?: string) => void;
@@ -33,6 +34,9 @@ export function LearnPanel({ onOpenInEditor }: Props) {
             </TabsTrigger>
             <TabsTrigger value="syllabus" className="text-xs">
               Syllabus
+            </TabsTrigger>
+            <TabsTrigger value="challenges" className="text-xs">
+              <Trophy className="mr-1 h-3.5 w-3.5" /> Challenges
             </TabsTrigger>
             <TabsTrigger value="quizzes" className="text-xs">
               <HelpCircle className="mr-1 h-3.5 w-3.5" /> Quiz
