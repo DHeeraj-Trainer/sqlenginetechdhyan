@@ -4,6 +4,7 @@ import type { EngineId, QueryResult, SqlEngine, TableInfo } from "@/types/workbe
 import { SqliteEngine } from "@/lib/db/engines/sqlite";
 import { PostgresEngine } from "@/lib/db/engines/postgres";
 import { AlaSqlEngine } from "@/lib/db/engines/alasql";
+import { MysqlEmulationEngine } from "@/lib/db/engines/mysql";
 import { buildScript } from "@/lib/db/sample-builder";
 import { sampleDatabases } from "@/lib/db/sample-databases";
 import {
@@ -38,10 +39,11 @@ interface EngineContextValue {
 
 const EngineContext = createContext<EngineContextValue | null>(null);
 
-const engineFactories: Record<Exclude<EngineId, "mysql">, () => SqlEngine> = {
+const engineFactories: Record<EngineId, () => SqlEngine> = {
   sqlite: () => new SqliteEngine(),
   postgres: () => new PostgresEngine(),
   alasql: () => new AlaSqlEngine(),
+  mysql: () => new MysqlEmulationEngine(),
 };
 
 export function EngineProvider({ children }: { children: ReactNode }) {
@@ -104,12 +106,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       setStatus("loading");
       setError(null);
       try {
-        if (id === "mysql") {
-          throw new Error(
-            "MySQL requires a server connection. Add a MySQL connection secret to enable this engine.",
-          );
-        }
-        const factory = engineFactories[id as Exclude<EngineId, "mysql">];
+        const factory = engineFactories[id];
         const inst = factory();
         await inst.init();
         engineRef.current = inst;
