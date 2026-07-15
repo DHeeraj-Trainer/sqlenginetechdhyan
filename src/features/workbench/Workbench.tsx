@@ -53,6 +53,7 @@ import { useAuth, signOut } from "@/hooks/use-auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ShareDialog } from "@/features/workbench/ShareDialog";
 
 
 type SidebarSection = "database" | "history" | "snippets" | "learn";
@@ -73,7 +74,7 @@ export function Workbench() {
 }
 
 function WorkbenchInner() {
-  const { engineId, switchEngine, status, error, tables, routerState } = useEngine();
+  const { engineId, switchEngine, status, error, tables, routerState, runQuery } = useEngine();
   const [theme, setTheme] = usePersistedState<"light" | "dark">("wb.theme.v1", "light");
   const [sidebar, setSidebar] = useState<SidebarSection>("database");
   const isMobile = useIsMobile();
@@ -81,6 +82,7 @@ function WorkbenchInner() {
   const [editorHidden, setEditorHidden] = usePersistedState<boolean>("wb.editor.hidden.v1", false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [results, setResults] = useState<QueryResult[] | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [activeResultIdx, setActiveResultIdx] = useState(0);
@@ -107,6 +109,23 @@ function WorkbenchInner() {
     }
     (window as unknown as { __wb_schema_words?: string[] }).__wb_schema_words = Array.from(new Set(words));
   }, [tables]);
+
+  // E2E test bridge: expose runQuery so authenticated smoke tests can drive
+  // multi-statement SQL through the live engine. Only active when the app
+  // opts in with window.__wbEnableTestBridge = true (set by tests) or when
+  // running against a preview build (import.meta.env.DEV).
+  useEffect(() => {
+    const w = window as unknown as {
+      __wb?: { runQuery: (sql: string) => Promise<unknown>; engineId: string };
+      __wbEnableTestBridge?: boolean;
+    };
+    if (import.meta.env.DEV || w.__wbEnableTestBridge) {
+      w.__wb = { runQuery: (sql: string) => runQuery(sql), engineId };
+    }
+    return () => {
+      if (w.__wb) delete w.__wb;
+    };
+  }, [runQuery, engineId]);
 
   const runActive = useCallback(async () => {
     if (!activeTab) return;
@@ -207,29 +226,12 @@ function WorkbenchInner() {
         onImport={handleImport}
         onExport={handleExport}
         onFormat={formatActive}
-        onShare={async () => {
+        onShare={() => {
           if (!activeTab?.content.trim()) {
             toast.error("Nothing to share — tab is empty.");
             return;
           }
-          try {
-            const { createShare } = await import("@/lib/workbench.functions");
-            const res = await createShare({
-              data: {
-                title: activeTab.name || "Shared query",
-                sql: activeTab.content,
-                engine: engineId,
-                visibility: "public" as const,
-              },
-            });
-            const url = `${window.location.origin}/s/${res.slug}`;
-            await navigator.clipboard.writeText(url);
-            toast.success("Share link copied to clipboard", { description: url });
-          } catch (err) {
-            toast.error("Could not create share link", {
-              description: (err as Error).message,
-            });
-          }
+          setShareOpen(true);
         }}
       />
 
@@ -434,6 +436,14 @@ function WorkbenchInner() {
         lastQuery={lastQuery}
         lastError={runError}
         onApplyQuery={applyTutorSql}
+      />
+
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        defaultTitle={activeTab?.name ?? "Shared query"}
+        sql={activeTab?.content ?? ""}
+        engineId={engineId}
       />
     </div>
   );
@@ -808,6 +818,7 @@ function ResultsHeader({
             <li key={i}>
               <button
                 onClick={() => onSelect(i)}
+                data-testid="result-tab"
                 className={`rounded px-2 py-0.5 text-[11px] ${
                   activeIdx === i ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"
                 }`}
