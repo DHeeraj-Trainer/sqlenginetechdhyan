@@ -24,7 +24,7 @@ export default defineTool({
     let q = supabaseForUser(ctx)
       .from("workbench_snippets")
       .select("id,name,engine,sql,tags,updated_at")
-      .eq("user_id", ctx.getUserId())
+      .eq("user_id", ctx.getUserId()!)
       .order("updated_at", { ascending: false })
       .limit(limit ?? 50);
     if (engine) q = q.eq("engine", engine);

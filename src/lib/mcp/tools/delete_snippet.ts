@@ -24,7 +24,7 @@ export default defineTool({
       .from("workbench_snippets")
       .delete()
       .eq("id", id)
-      .eq("user_id", ctx.getUserId());
+      .eq("user_id", ctx.getUserId()!);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return { content: [{ type: "text", text: `Deleted ${id}` }] };
   },

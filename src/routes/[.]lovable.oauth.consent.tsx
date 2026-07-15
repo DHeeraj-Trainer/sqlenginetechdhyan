@@ -116,7 +116,7 @@ function ConsentPage() {
                 Requested permissions
               </div>
               <ul className="list-inside list-disc text-sm">
-                {scopes.map((s) => (
+                {scopes.map((s: string) => (
                   <li key={s}>{s}</li>
                 ))}
               </ul>

@@ -23,7 +23,7 @@ export default defineTool({
     const { data, error } = await supabaseForUser(ctx)
       .from("shared_queries")
       .select("id,slug,title,description,engine,sql,visibility,view_count,updated_at")
-      .eq("owner_id", ctx.getUserId())
+      .eq("owner_id", ctx.getUserId()!)
       .order("updated_at", { ascending: false })
       .limit(limit ?? 50);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };

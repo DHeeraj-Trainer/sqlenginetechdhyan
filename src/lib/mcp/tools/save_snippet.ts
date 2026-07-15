@@ -25,7 +25,7 @@ export default defineTool({
     if (!ctx.isAuthenticated()) return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     const { data, error } = await supabaseForUser(ctx)
       .from("workbench_snippets")
-      .insert({ user_id: ctx.getUserId(), name, sql, engine, tags: tags ?? [] })
+      .insert({ user_id: ctx.getUserId()!, name, sql, engine, tags: tags ?? [] })
       .select()
       .single();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };

@@ -24,7 +24,7 @@ export default defineTool({
     let q = supabaseForUser(ctx)
       .from("workbench_history")
       .select("id,engine,sql,status,duration_ms,error_message,executed_at")
-      .eq("user_id", ctx.getUserId())
+      .eq("user_id", ctx.getUserId()!)
       .order("executed_at", { ascending: false })
       .limit(limit ?? 25);
     if (status) q = q.eq("status", status);
