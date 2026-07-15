@@ -82,6 +82,7 @@ function WorkbenchInner() {
   const [editorHidden, setEditorHidden] = usePersistedState<boolean>("wb.editor.hidden.v1", false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [results, setResults] = useState<QueryResult[] | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [activeResultIdx, setActiveResultIdx] = useState(0);
