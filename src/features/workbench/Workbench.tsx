@@ -818,6 +818,7 @@ function ResultsHeader({
             <li key={i}>
               <button
                 onClick={() => onSelect(i)}
+                data-testid="result-tab"
                 className={`rounded px-2 py-0.5 text-[11px] ${
                   activeIdx === i ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70"
                 }`}
