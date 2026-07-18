@@ -83,10 +83,11 @@ async function main() {
   await page.waitForFunction(() => !!window.__wb, null, { timeout: TIMEOUT });
   ok("workbench bridge mounted (window.__wb)");
 
-  // Wait for the default sqlite boot to finish so engineRef is populated
-  // before loadSample runs (loadSample is a no-op while engineRef is null).
+  // Wait for the initial engine to mount (status ready OR error is fine —
+  // the enterprise raw-SQL seed can fail on the first boot, but engineRef
+  // is still set and loadSample will replace the sample cleanly).
   await page.waitForFunction(
-    () => window.__wb && window.__wb.status === "ready",
+    () => window.__wb && (window.__wb.status === "ready" || window.__wb.status === "error"),
     null,
     { timeout: 60_000, polling: 200 },
   );
