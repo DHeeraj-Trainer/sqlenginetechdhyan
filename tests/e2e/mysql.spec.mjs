@@ -740,6 +740,122 @@ async function main() {
     rows: [["alpha"], ["alphabet"]],
   });
 
+  // --- 6e. REGEXP / NOT REGEXP (MySQL POSIX-ERE, emulated via JS RegExp) ---
+  // Anchored pattern: exactly the word "alpha".
+  const reAnchoredRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` REGEXP '^alpha$' ORDER BY `name`;",
+  );
+  assertResult("REGEXP '^alpha$' matches whole-string 'alpha'", reAnchoredRes, {
+    columns: ["name"],
+    rows: [["alpha"]],
+  });
+
+  // Character class + quantifier: names starting with 'a' followed by letters.
+  const reClassRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` REGEXP '^a[a-z]+$' ORDER BY `name`;",
+  );
+  assertResult("REGEXP '^a[a-z]+$' matches lowercase-letter-only names", reClassRes, {
+    columns: ["name"],
+    rows: [["alpha"], ["alphabet"]],
+  });
+
+  // Alternation.
+  const reAltRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` REGEXP 'alpha|beta' ORDER BY `name`;",
+  );
+  assertResult("REGEXP 'alpha|beta' matches either literal", reAltRes, {
+    columns: ["name"],
+    rows: [["alpha"], ["alphabet"], ["beta"]],
+  });
+
+  // Digit meta \d — must match rows containing digits.
+  const reDigitRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` REGEXP '[0-9]' ORDER BY `name`;",
+  );
+  assertResult("REGEXP '[0-9]' matches rows containing a digit", reDigitRes, {
+    columns: ["name"],
+    rows: [["100% new"], ["50%_off"]],
+  });
+
+  // Escaped metacharacter: literal '%'. In the SQL string `\\%` = `\%`, which
+  // the regex engine reads as an escaped literal percent sign.
+  const reEscPctRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` REGEXP '\\%' ORDER BY `name`;",
+  );
+  assertResult("REGEXP '\\%' matches literal '%'", reEscPctRes, {
+    columns: ["name"],
+    rows: [["100% new"], ["50%_off"]],
+  });
+
+  // Escaped '.' — must NOT act as any-char wildcard. Contrast with unescaped
+  // '.' which acts as any-char (matches every row). We assert both sides.
+  const reDotWildRes = await run(
+    "SELECT COUNT(*) AS n FROM `labels` WHERE `name` REGEXP 'a.b';",
+  );
+  assertResult("REGEXP 'a.b' — '.' is any-char wildcard", reDotWildRes, {
+    columns: ["n"],
+    rows: [[1]], // only 'a_b' has one char between 'a' and 'b'
+  });
+  const reEscDotRes = await run(
+    "SELECT COUNT(*) AS n FROM `labels` WHERE `name` REGEXP 'a\\.b';",
+  );
+  assertResult("REGEXP 'a\\.b' — escaped '.' is literal (0 matches)", reEscDotRes, {
+    columns: ["n"],
+    rows: [[0]],
+  });
+
+
+  // Escaped backslash: JS `\\\\` = SQL string `\\` = regex `\\` = one literal
+  // backslash. Row 'has\backslash' (single stored backslash) must match.
+  const reEscBackRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` REGEXP '\\\\' ORDER BY `name`;",
+  );
+  assertResult("REGEXP '\\\\' matches literal backslash", reEscBackRes, {
+    columns: ["name"],
+    rows: [["has\\backslash"]],
+  });
+
+
+  // NOT REGEXP — inverse of the anchored letter class above.
+  const reNotRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` NOT REGEXP '^a[a-z]+$' ORDER BY `name`;",
+  );
+  assertResult("NOT REGEXP inverts the match set", reNotRes, {
+    columns: ["name"],
+    rows: [
+      ["100% new"],
+      ["50%_off"],
+      ["a_b"],
+      ["beta"],
+      ["has\\backslash"],
+      ["under_score"],
+    ],
+  });
+
+  // RLIKE — MySQL alias for REGEXP; must produce identical results.
+  const rlikeRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` RLIKE '^alpha' ORDER BY `name`;",
+  );
+  assertResult("RLIKE '^alpha' behaves as REGEXP alias", rlikeRes, {
+    columns: ["name"],
+    rows: [["alpha"], ["alphabet"]],
+  });
+
+  // UI render check — REGEXP result flows through ResultsGrid.
+  await page.evaluate(async () => {
+    await window.__wb.runAndRender(
+      "SELECT `name` FROM `labels` WHERE `name` REGEXP '^alpha' ORDER BY `name`;",
+    );
+  });
+  const regexpUiVisible = await page
+    .locator('[role="gridcell"] >> text=alphabet')
+    .first()
+    .isVisible()
+    .catch(() => false);
+  if (regexpUiVisible) ok("ResultsGrid renders REGEXP match ('alphabet' cell visible)");
+  else fail("ResultsGrid did not render REGEXP result");
+
+
   // Row count sanity — total row count in labels table.
   const totalRes = await run("SELECT COUNT(*) AS n FROM `labels`;");
   assertResult("labels table has 8 seeded rows", totalRes, {

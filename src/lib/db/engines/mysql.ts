@@ -15,6 +15,44 @@ export class MysqlEmulationEngine extends SqliteEngine {
   readonly id: EngineId = "mysql";
   readonly label = "MySQL (emulated)";
 
+  async init(): Promise<void> {
+    await super.init();
+    this.registerRegexp();
+  }
+
+  async reset(): Promise<void> {
+    await super.reset();
+    this.registerRegexp();
+  }
+
+  /**
+   * Register a `regexp(pattern, value)` SQL function so `col REGEXP pat` and
+   * `col NOT REGEXP pat` work under the emulator. SQLite's grammar recognises
+   * REGEXP as a two-argument function call — we bind it to JS RegExp with
+   * pattern caching for hot loops. Matches MySQL's default POSIX-ERE flavour
+   * closely enough for the vast majority of interview-style patterns.
+   */
+  private registerRegexp() {
+    const db = (this as unknown as { db: import("sql.js").Database | null }).db;
+    if (!db) return;
+    const cache = new Map<string, RegExp | null>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (db as any).create_function("regexp", (pattern: string, value: unknown) => {
+      if (value == null || pattern == null) return 0;
+      let re = cache.get(pattern);
+      if (re === undefined) {
+        try {
+          re = new RegExp(pattern);
+        } catch {
+          re = null;
+        }
+        cache.set(pattern, re);
+      }
+      if (!re) return 0;
+      return re.test(String(value)) ? 1 : 0;
+    });
+  }
+
   async exec(sql: string): Promise<QueryResult[]> {
     const statements = splitTopLevel(sql);
     const results: QueryResult[] = [];
@@ -37,6 +75,7 @@ export class MysqlEmulationEngine extends SqliteEngine {
     return super.loadScript(translateMysql(sql));
   }
 }
+
 
 /** Minimal statement splitter that is quote-aware; keeps semicolons out of strings. */
 function splitTopLevel(sql: string): string[] {
@@ -230,6 +269,9 @@ function transformCode(code: string): string {
 
   // Function mappings
   s = s.replace(/\bIFNULL\s*\(/gi, "COALESCE(");
+  // RLIKE is a MySQL alias for REGEXP. Normalise so the SQLite REGEXP hook fires.
+  s = s.replace(/\bNOT\s+RLIKE\b/gi, "NOT REGEXP");
+  s = s.replace(/\bRLIKE\b/gi, "REGEXP");
   s = s.replace(/\bNOW\s*\(\s*\)/gi, "CURRENT_TIMESTAMP");
   s = s.replace(/\bCURDATE\s*\(\s*\)/gi, "DATE('now')");
   s = s.replace(/\bCURTIME\s*\(\s*\)/gi, "TIME('now')");
