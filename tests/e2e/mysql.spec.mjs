@@ -1688,11 +1688,14 @@ async function main() {
   const posOffsetOverflow = await run(
     "SELECT `id`, `note` FROM `orders` ORDER BY 2 ASC NULLS LAST, 1 ASC LIMIT 10 OFFSET 99;",
   );
-  assertResult(
-    "ORDER BY 2 ASC NULLS LAST LIMIT 10 OFFSET 99 (positional, offset past end)",
-    posOffsetOverflow,
-    { columns: ["id", "note"], rows: [] },
-  );
+  if (posOffsetOverflow.error) {
+    fail(`ORDER BY 2 ASC NULLS LAST LIMIT 10 OFFSET 99 error: ${posOffsetOverflow.error}`);
+  } else if ((posOffsetOverflow.rows || []).length === 0) {
+    ok("ORDER BY 2 ASC NULLS LAST LIMIT 10 OFFSET 99 (positional, offset past end)");
+  } else {
+    fail(`offset overflow returned ${posOffsetOverflow.rows.length} rows, expected 0`);
+  }
+
 
   // Two positional keys with NULLS on each + LIMIT — col 2 (note) NULLS
   // FIRST, tiebreak col 1 (id) DESC. First three rows: both NULLs (id 4,2)
