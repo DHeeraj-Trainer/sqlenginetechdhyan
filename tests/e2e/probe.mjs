@@ -13,11 +13,10 @@ await p.evaluate(() => window.__wb.runQuery(`
   INSERT INTO names VALUES (1,'apple'),(2,'Banana'),(3,NULL),(4,'cherry'),(5,'BLUEBERRY'),(6,NULL),(7,'avocado');
 `));
 for (const q of [
-  "SELECT id, name FROM names ORDER BY (UPPER(name) COLLATE utf8mb4_bin) ASC NULLS LAST, id ASC;",
   "SELECT id, name FROM names ORDER BY (name COLLATE utf8mb4_bin) ASC NULLS LAST, id ASC;",
-  "SELECT id, name FROM names ORDER BY name COLLATE utf8mb4_unicode_ci DESC NULLS FIRST, id ASC;",
-  "SELECT id, name FROM names WHERE name IS NOT NULL ORDER BY UPPER(name) COLLATE utf8mb4_bin ASC, id ASC;",
-  "SELECT id, name FROM names WHERE name IS NOT NULL ORDER BY (name) COLLATE utf8mb4_unicode_ci DESC, id ASC;",
+  "SELECT id, name FROM names ORDER BY (name COLLATE utf8mb4_unicode_ci) DESC NULLS FIRST, id ASC;",
+  "SELECT id, name FROM names ORDER BY (COALESCE(name,'') COLLATE utf8mb4_bin) ASC NULLS LAST, id ASC;",
+  "SELECT id, name FROM names ORDER BY (SUBSTR(name,1,3) COLLATE utf8mb4_unicode_ci) ASC NULLS FIRST, id ASC;",
 ]) {
   const r = await p.evaluate((s) => window.__wb.runQuery(s), q);
   console.log('---', q);
