@@ -85,7 +85,7 @@ export function Workbench() {
 }
 
 function WorkbenchInner() {
-  const { engineId, switchEngine, status, error, tables, routerState, runQuery } = useEngine();
+  const { engineId, switchEngine, status, error, tables, routerState, runQuery, loadSample } = useEngine();
   const [theme, setTheme] = usePersistedState<"light" | "dark">("wb.theme.v1", "light");
   const [sidebar, setSidebar] = useState<SidebarSection>("database");
   const isMobile = useIsMobile();
