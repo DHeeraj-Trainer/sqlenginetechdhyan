@@ -5,8 +5,8 @@ import type { EngineId, QueryResult, SqlEngine, TableInfo } from "@/types/workbe
 export class SqliteEngine implements SqlEngine {
   readonly id: EngineId = "sqlite";
   readonly label: string = "SQLite (sql.js)";
-  private db: Database | null = null;
-  private ready: Promise<void> | null = null;
+  protected db: Database | null = null;
+  protected ready: Promise<void> | null = null;
 
   async init(): Promise<void> {
     if (this.db) return;
