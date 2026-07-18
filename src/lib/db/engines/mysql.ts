@@ -125,8 +125,88 @@ export function translateMysql(input: string): string {
     transformed.splice(i + 1, 0, { kind: "code", value: " ESCAPE '\\'" });
     i++;
   }
-  return transformed.map((t) => t.value).join("");
+  return rewriteConcat(transformed.map((t) => t.value).join(""));
 }
+
+/**
+ * Rewrite `CONCAT(a, b, ...)` → `(a || b || ...)` on the fully re-joined SQL
+ * so arguments that contain string literals (which the tokenizer split out of
+ * the code stream) are handled correctly. Quote/paren-aware; only splits on
+ * top-level commas.
+ */
+function rewriteConcat(sql: string): string {
+  const out: string[] = [];
+  let i = 0;
+  const re = /\bCONCAT\s*\(/gi;
+  let m: RegExpExecArray | null;
+  let last = 0;
+  while ((m = re.exec(sql)) !== null) {
+    const start = m.index;
+    // Skip matches inside strings/comments by scanning from `last` to `start`.
+    if (insideStringOrComment(sql, start)) continue;
+    const openParen = m.index + m[0].length - 1;
+    // Find matching close paren.
+    let depth = 1;
+    let j = openParen + 1;
+    let s = false, d = false;
+    for (; j < sql.length && depth > 0; j++) {
+      const c = sql[j];
+      const p = sql[j - 1];
+      if (!d && c === "'" && p !== "\\") s = !s;
+      else if (!s && c === '"' && p !== "\\") d = !d;
+      else if (!s && !d) {
+        if (c === "(") depth++;
+        else if (c === ")") depth--;
+      }
+    }
+    if (depth !== 0) continue;
+    const inner = sql.slice(openParen + 1, j - 1);
+    // Split top-level commas.
+    const parts: string[] = [];
+    let cur = "";
+    let pd = 0, ps = false, pdq = false;
+    for (let k = 0; k < inner.length; k++) {
+      const c = inner[k];
+      const p = inner[k - 1];
+      if (!pdq && c === "'" && p !== "\\") ps = !ps;
+      else if (!ps && c === '"' && p !== "\\") pdq = !pdq;
+      else if (!ps && !pdq) {
+        if (c === "(") pd++;
+        else if (c === ")") pd--;
+      }
+      if (c === "," && pd === 0 && !ps && !pdq) {
+        parts.push(cur);
+        cur = "";
+      } else cur += c;
+    }
+    if (cur.length) parts.push(cur);
+    out.push(sql.slice(last, start));
+    out.push("(" + parts.map((p) => p.trim()).join(" || ") + ")");
+    last = j;
+    re.lastIndex = j;
+  }
+  out.push(sql.slice(last));
+  return out.join("");
+}
+
+/** Cheap check: is `pos` inside a '…' string or /* … *​/ / -- comment? */
+function insideStringOrComment(sql: string, pos: number): boolean {
+  let s = false;
+  for (let i = 0; i < pos; i++) {
+    const c = sql[i];
+    if (c === "'" && sql[i - 1] !== "\\") s = !s;
+    if (!s && c === "-" && sql[i + 1] === "-") {
+      const nl = sql.indexOf("\n", i);
+      if (nl === -1 || nl >= pos) return true;
+      i = nl;
+    }
+    if (!s && c === "/" && sql[i + 1] === "*") {
+      const end = sql.indexOf("*/", i + 2);
+      if (end === -1 || end >= pos) return true;
+      i = end + 1;
+    }
+  }
+  return s;
 
 interface Token {
   kind: "code" | "string" | "comment";
