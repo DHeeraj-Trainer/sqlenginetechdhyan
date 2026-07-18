@@ -1716,8 +1716,113 @@ async function main() {
     },
   );
 
+  // --- 9i. Arithmetic expressions in ORDER BY + NULLS FIRST/LAST -----------
+  // MySQL rule: only a bare positive integer literal is a positional column
+  // reference. Any arithmetic (2+(1), 1*2, id+0) is a normal expression, so
+  // literal arithmetic evaluates to a constant across every row and provides
+  // no ordering — the secondary key alone decides row order. Column-based
+  // expressions still sort by the computed value.
+  // Uses `orders`: 1 alice 'first' | 2 bob NULL | 3 carol 'vip' | 4 dave NULL | 5 erin 'promo'.
 
+  // 2+(1) is a constant expression, NOT positional col 3 — first key is a
+  // no-op, id ASC tiebreak determines the full order.
+  const exprConstPlusAsc = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2+(1) NULLS FIRST, `id` ASC;",
+  );
+  assertResult(
+    "ORDER BY 2+(1) NULLS FIRST, id ASC (constant expr → id ASC decides)",
+    exprConstPlusAsc,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [1, "first"],
+        [2, null],
+        [3, "vip"],
+        [4, null],
+        [5, "promo"],
+      ],
+    },
+  );
 
+  // 1*2 is also a constant expression — id DESC tiebreak flips the order.
+  const exprConstMulDesc = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 1*2 NULLS LAST, `id` DESC;",
+  );
+  assertResult(
+    "ORDER BY 1*2 NULLS LAST, id DESC (constant expr → id DESC decides)",
+    exprConstMulDesc,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [5, "promo"],
+        [4, null],
+        [3, "vip"],
+        [2, null],
+        [1, "first"],
+      ],
+    },
+  );
+
+  // Column expression `id+0` — sorts by the computed value (same as id).
+  // NULLS FIRST is a no-op here because `id+0` is never NULL, but the clause
+  // must still parse and translate correctly.
+  const exprIdPlusZero = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY `id`+0 DESC NULLS FIRST;",
+  );
+  assertResult(
+    "ORDER BY id+0 DESC NULLS FIRST (column expression, no NULLs in key)",
+    exprIdPlusZero,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [5, "promo"],
+        [4, null],
+        [3, "vip"],
+        [2, null],
+        [1, "first"],
+      ],
+    },
+  );
+
+  // Column expression that CAN be NULL — LENGTH(note) is NULL wherever note
+  // is NULL. NULLS LAST forces those rows to the end; among non-NULLs, sort
+  // by string length ascending, tiebreak id ASC.
+  //   LENGTH('first')=5, LENGTH('vip')=3, LENGTH('promo')=5.
+  const exprLenNullsLast = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY LENGTH(`note`) ASC NULLS LAST, `id` ASC;",
+  );
+  assertResult(
+    "ORDER BY LENGTH(note) ASC NULLS LAST, id ASC (NULLable expression)",
+    exprLenNullsLast,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [3, "vip"],
+        [1, "first"],
+        [5, "promo"],
+        [2, null],
+        [4, null],
+      ],
+    },
+  );
+
+  // Constant arithmetic expression combined with LIMIT/OFFSET — because the
+  // first key is constant, the secondary id ASC key alone controls which rows
+  // fall inside the pagination window.
+  const exprConstPaged = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2+(1) NULLS FIRST, `id` ASC LIMIT 2, 2;",
+  );
+  assertResult(
+    "ORDER BY 2+(1) NULLS FIRST, id ASC LIMIT 2,2 (constant expr + paging)",
+    exprConstPaged,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [3, "vip"],
+        [4, null],
+      ],
+    },
+  );
 
 
 
