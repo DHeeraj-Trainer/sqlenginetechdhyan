@@ -674,26 +674,21 @@ async function main() {
   const backslashEscRes = await run(
     "SELECT `name` FROM `labels` WHERE `name` LIKE '%\\%%' ORDER BY `name`;",
   );
-  {
-    // Accept either MySQL semantics (matches rows containing literal '%')
-    // or engine reporting a translation gap — this documents the current
-    // behavior explicitly rather than silently letting a wrong shape pass.
-    const last = backslashEscRes.results?.[backslashEscRes.results.length - 1];
-    if (backslashEscRes.error) {
-      // Translator doesn't rewrite bare backslash escapes; log as info
-      // rather than a hard fail so this test surfaces the gap explicitly.
-      log("!", `LIKE '\\\\%%' (backslash-escape) not supported by emulator: ${backslashEscRes.error.split("MYSQL_DIAG")[0]}`);
-    } else if (!last) {
-      fail("LIKE backslash-escape: no result");
-    } else {
-      const rows = last.rows.map((r) => r[0]);
-      if (rows.includes("100% new") && rows.includes("50%_off")) {
-        ok("LIKE with backslash-escape matches literal '%' (MySQL default semantics)");
-      } else {
-        log("!", `LIKE backslash-escape returned unexpected rows: ${JSON.stringify(rows)} (documenting divergence)`);
-      }
-    }
-  }
+  assertResult(
+    "LIKE '%\\%%' matches literal '%' (MySQL default backslash escape)",
+    backslashEscRes,
+    { columns: ["name"], rows: [["100% new"], ["50%_off"]] },
+  );
+
+  // Backslash-escaped underscore — must match literal '_', not any single char.
+  const backslashUnderRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%\\_%' ORDER BY `name`;",
+  );
+  assertResult(
+    "LIKE '%\\_%' matches literal '_' (MySQL default backslash escape)",
+    backslashUnderRes,
+    { columns: ["name"], rows: [["50%_off"], ["has\\backslash"]] },
+  );
 
   // Row count sanity — total row count in labels table.
   const totalRes = await run("SELECT COUNT(*) AS n FROM `labels`;");
