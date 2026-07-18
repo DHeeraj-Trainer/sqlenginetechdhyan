@@ -690,6 +690,54 @@ async function main() {
     { columns: ["name"], rows: [["50%_off"], ["a_b"], ["under_score"]] },
   );
 
+  // --- 6d. LIKE with a non-backslash ESCAPE character ('#') ----------------
+  // MySQL accepts any single-character ESCAPE; verify '#' behaves identically
+  // to '!' above and does not collide with the default backslash rules.
+  const hashPercentRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%#%%' ESCAPE '#' ORDER BY `name`;",
+  );
+  assertResult("LIKE with ESCAPE '#' matches literal '%'", hashPercentRes, {
+    columns: ["name"],
+    rows: [["100% new"], ["50%_off"]],
+  });
+
+  const hashUnderRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%#_%' ESCAPE '#' ORDER BY `name`;",
+  );
+  assertResult("LIKE with ESCAPE '#' matches literal '_'", hashUnderRes, {
+    columns: ["name"],
+    rows: [["50%_off"], ["a_b"], ["under_score"]],
+  });
+
+  const hashBothRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%#%#_%' ESCAPE '#' ORDER BY `name`;",
+  );
+  assertResult("LIKE with ESCAPE '#' matches literal '%_' substring", hashBothRes, {
+    columns: ["name"],
+    rows: [["50%_off"]],
+  });
+
+  // '#' as escape must NOT treat backslashes specially — a pattern with a
+  // backslash and ESCAPE '#' should match literal backslash rows.
+  const hashBackslashRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%\\\\%' ESCAPE '#' ORDER BY `name`;",
+  );
+  assertResult(
+    "ESCAPE '#' leaves backslash as a literal character",
+    hashBackslashRes,
+    { columns: ["name"], rows: [["has\\backslash"]] },
+  );
+
+  // Un-escaped '#' inside the pattern is a literal (no rows contain '#').
+  const hashLiteralRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%#%' ESCAPE '#' ORDER BY `name`;",
+  );
+  assertResult(
+    "ESCAPE '#' with un-paired '#' matches literal '%' at end (MySQL semantics)",
+    hashLiteralRes,
+    { columns: ["name"], rows: [["100% new"], ["50%_off"]] },
+  );
+
   // Row count sanity — total row count in labels table.
   const totalRes = await run("SELECT COUNT(*) AS n FROM `labels`;");
   assertResult("labels table has 8 seeded rows", totalRes, {
