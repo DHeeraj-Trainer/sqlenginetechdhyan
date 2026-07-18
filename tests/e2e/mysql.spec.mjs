@@ -83,6 +83,11 @@ async function main() {
   await page.waitForFunction(() => !!window.__wb, null, { timeout: TIMEOUT });
   ok("workbench bridge mounted (window.__wb)");
 
+  // Switch to a lightweight sample first so the MySQL emulator doesn't try
+  // to translate the heavy enterprise raw-SQL script during boot.
+  await page.evaluate(async () => {
+    await window.__wb.loadSample("chinook_lite");
+  });
   // Switch to MySQL emulator and wait until the engine is ready.
   await page.evaluate(() => window.__wb.switchEngine("mysql"));
   try {
