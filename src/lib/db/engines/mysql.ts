@@ -269,6 +269,9 @@ function transformCode(code: string): string {
 
   // Function mappings
   s = s.replace(/\bIFNULL\s*\(/gi, "COALESCE(");
+  // RLIKE is a MySQL alias for REGEXP. Normalise so the SQLite REGEXP hook fires.
+  s = s.replace(/\bNOT\s+RLIKE\b/gi, "NOT REGEXP");
+  s = s.replace(/\bRLIKE\b/gi, "REGEXP");
   s = s.replace(/\bNOW\s*\(\s*\)/gi, "CURRENT_TIMESTAMP");
   s = s.replace(/\bCURDATE\s*\(\s*\)/gi, "DATE('now')");
   s = s.replace(/\bCURTIME\s*\(\s*\)/gi, "TIME('now')");
