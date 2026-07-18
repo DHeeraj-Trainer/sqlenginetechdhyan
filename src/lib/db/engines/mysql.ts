@@ -382,6 +382,18 @@ function transformCode(code: string): string {
     return "(" + parts.map((p) => p.trim()).join(" || ") + ")";
   });
 
+  // COLLATE <mysql-collation> → COLLATE <sqlite-collation>.
+  // MySQL exposes collation names like `utf8mb4_bin`, `utf8mb4_unicode_ci`,
+  // `latin1_general_cs`, `binary`. SQLite only has BINARY / NOCASE / RTRIM.
+  // Map by suffix: *_bin / "binary" → BINARY, *_ci → NOCASE, *_cs → BINARY.
+  s = s.replace(/\bCOLLATE\s+([A-Za-z_][\w]*)/gi, (_m, name: string) => {
+    const n = name.toLowerCase();
+    if (n === "binary" || n.endsWith("_bin")) return "COLLATE BINARY";
+    if (n.endsWith("_ci")) return "COLLATE NOCASE";
+    if (n.endsWith("_cs")) return "COLLATE BINARY";
+    return "COLLATE BINARY";
+  });
+
   // LIMIT offset, count → LIMIT count OFFSET offset
   s = s.replace(/\bLIMIT\s+(\d+)\s*,\s*(\d+)/gi, "LIMIT $2 OFFSET $1");
 
