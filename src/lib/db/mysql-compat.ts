@@ -226,15 +226,17 @@ export const compatFeatures: CompatFeature[] = [
     description: "MySQL upsert form.",
     category: "DML",
     example: "INSERT INTO t (id, v) VALUES (1, 'a') ON DUPLICATE KEY UPDATE v = VALUES(v);",
-    status: { mysql: U, sqlite: U, postgres: U, alasql: U },
-    notes: "Rewrite to `INSERT … ON CONFLICT (id) DO UPDATE SET …` for portability.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: U, alasql: U },
+    notes:
+      "Live MySQL runs it natively. Emulator rewrites to `ON CONFLICT DO UPDATE SET col = excluded.col …` for SQLite.",
   },
   {
     name: "INSERT IGNORE",
     description: "Skip rows on unique-key conflict.",
     category: "DML",
-    status: { mysql: U, sqlite: E, postgres: U, alasql: U },
-    notes: "Use `INSERT OR IGNORE` (SQLite) or `ON CONFLICT DO NOTHING` (Postgres).",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: U, alasql: U },
+    notes:
+      "Live MySQL runs `INSERT IGNORE` natively. Emulator rewrites to `INSERT OR IGNORE` for SQLite.",
   },
   {
     name: "REPLACE INTO",
