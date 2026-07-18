@@ -187,8 +187,9 @@ export const compatFeatures: CompatFeature[] = [
     description: "Auto-generated integer primary keys.",
     category: "DDL",
     example: "id INT AUTO_INCREMENT PRIMARY KEY",
-    status: { mysql: E, sqlite: E, postgres: E, alasql: E },
-    notes: "Rewritten to `INTEGER PRIMARY KEY AUTOINCREMENT` for SQLite; SERIAL for Postgres.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: E, alasql: E },
+    notes:
+      "Live MySQL runs `AUTO_INCREMENT` natively. Emulator rewrites to `INTEGER PRIMARY KEY AUTOINCREMENT` for SQLite and normalises `INT AUTO_INCREMENT PRIMARY KEY` ordering.",
   },
   {
     name: "ENGINE=/CHARSET=/COLLATE= options",
