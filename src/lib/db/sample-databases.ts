@@ -1,8 +1,14 @@
 import type { SampleDatabase } from "./sample-builder";
+import { enterpriseBanking } from "./enterprise/banking";
+import { enterpriseHealthcare } from "./enterprise/healthcare";
+import { enterpriseRetail } from "./enterprise/retail";
 
 // Curated production-quality sample databases.
 // Legacy domain data (10 domains) is exposed separately as tutorials.
 export const sampleDatabases: SampleDatabase[] = [
+  enterpriseBanking,
+  enterpriseHealthcare,
+  enterpriseRetail,
   {
     id: "chinook_lite",
     name: "Chinook Lite (Music Store)",
