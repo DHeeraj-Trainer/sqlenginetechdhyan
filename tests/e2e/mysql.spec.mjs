@@ -1407,6 +1407,92 @@ async function main() {
   );
 
 
+  // --- 9f. Positional ORDER BY references combined with NULLS FIRST/LAST -
+  // MySQL itself doesn't parse NULLS FIRST/LAST, but the emulator accepts
+  // the portable extension on positional column references (ORDER BY 2, 1)
+  // just as it does on named columns. Uses the `orders` seed rows:
+  //   1 alice 'first' | 2 bob NULL | 3 carol 'vip' | 4 dave NULL | 5 erin 'promo'
+
+  // Column 2 = note, implicit ASC with NULLS LAST; tiebreak on column 1 (id).
+  const posNullsLast = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 NULLS LAST, 1 NULLS FIRST;",
+  );
+  assertResult(
+    "ORDER BY 2 NULLS LAST, 1 NULLS FIRST (positional, implicit ASC)",
+    posNullsLast,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [1, "first"],
+        [5, "promo"],
+        [3, "vip"],
+        [2, null],
+        [4, null],
+      ],
+    },
+  );
+
+  // Column 2 = note DESC NULLS FIRST — overrides MySQL default (DESC → NULLs last).
+  const posDescNullsFirst = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 DESC NULLS FIRST, 1 ASC;",
+  );
+  assertResult(
+    "ORDER BY 2 DESC NULLS FIRST, 1 ASC (positional)",
+    posDescNullsFirst,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [2, null],
+        [4, null],
+        [3, "vip"],
+        [5, "promo"],
+        [1, "first"],
+      ],
+    },
+  );
+
+  // Positional with mixed directions — implicit ASC NULLS FIRST, then id DESC.
+  const posNullsFirstIdDesc = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 NULLS FIRST, 1 DESC;",
+  );
+  assertResult(
+    "ORDER BY 2 NULLS FIRST, 1 DESC (positional, tiebreak DESC)",
+    posNullsFirstIdDesc,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [4, null],
+        [2, null],
+        [1, "first"],
+        [5, "promo"],
+        [3, "vip"],
+      ],
+    },
+  );
+
+  // Three-column select with positional NULLS on col 3, tiebreak on col 2.
+  const posThreeCol = await run(
+    "SELECT `id`, `customer`, `note` FROM `orders` ORDER BY 3 NULLS LAST, 2 ASC;",
+  );
+  assertResult(
+    "ORDER BY 3 NULLS LAST, 2 ASC (positional across 3 columns)",
+    posThreeCol,
+    {
+      columns: ["id", "customer", "note"],
+      rows: [
+        [1, "alice", "first"],
+        [5, "erin", "promo"],
+        [3, "carol", "vip"],
+        [2, "bob", null],
+        [4, "dave", null],
+      ],
+    },
+  );
+
+
+
+
+
   // may be empty until the user hits Run in the editor). Bridge queries
   // above go straight through the same QueryResult path that populates the
   // tabs, so column/row assertions match exactly what the UI would show.

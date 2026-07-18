@@ -397,26 +397,13 @@ function transformCode(code: string): string {
   // LIMIT offset, count → LIMIT count OFFSET offset
   s = s.replace(/\bLIMIT\s+(\d+)\s*,\s*(\d+)/gi, "LIMIT $2 OFFSET $1");
 
-  // NULLS FIRST / NULLS LAST is not MySQL syntax, but is commonly written by
-  // portability-minded users. Translate it into an equivalent (expr IS NULL)
-  // sort prefix so behaviour is deterministic and matches MySQL's own
-  // default NULL ordering (ASC → NULLs first, DESC → NULLs last) when the
-  // NULLS clause is redundant, and overrides it correctly when it isn't.
-  // Match with explicit direction first (ASC|DESC NULLS ...), then bare.
-  s = s.replace(
-    /(`[^`]+`|"[^"]+"|[A-Za-z_][\w.]*)\s+(ASC|DESC)\s+NULLS\s+(FIRST|LAST)\b/gi,
-    (_m, term: string, dir: string, pos: string) => {
-      const nullDir = pos.toUpperCase() === "FIRST" ? "DESC" : "ASC";
-      return `(${term}) IS NULL ${nullDir}, ${term} ${dir}`;
-    },
-  );
-  s = s.replace(
-    /(`[^`]+`|"[^"]+"|[A-Za-z_][\w.]*)\s+NULLS\s+(FIRST|LAST)\b/gi,
-    (_m, term: string, pos: string) => {
-      const nullDir = pos.toUpperCase() === "FIRST" ? "DESC" : "ASC";
-      return `(${term}) IS NULL ${nullDir}, ${term}`;
-    },
-  );
+  // NULLS FIRST / NULLS LAST — SQLite (>= 3.30) parses and executes these
+  // natively with the same semantics MySQL users expect from the portable
+  // extension, and importantly it works for both named columns and
+  // positional references (ORDER BY 2 NULLS LAST). Passing the clause
+  // through untouched avoids the pitfalls of a regex rewrite (which
+  // couldn't distinguish `2 DESC NULLS FIRST` from an identifier `DESC`).
+
 
   // INSERT IGNORE INTO → INSERT OR IGNORE INTO (SQLite equivalent).
   s = s.replace(/\bINSERT\s+IGNORE\s+INTO\b/gi, "INSERT OR IGNORE INTO");
