@@ -805,15 +805,16 @@ async function main() {
   });
 
 
-  // Escaped backslash: pattern `\\\\` in JS = `\\\\` in SQL text = `\\` regex
-  // = one literal backslash. Row 'has\backslash' contains one backslash.
+  // Escaped backslash: JS `\\\\` = SQL string `\\` = regex `\\` = one literal
+  // backslash. Row 'has\backslash' (single stored backslash) must match.
   const reEscBackRes = await run(
-    "SELECT `name` FROM `labels` WHERE `name` REGEXP '\\\\\\\\' ORDER BY `name`;",
+    "SELECT `name` FROM `labels` WHERE `name` REGEXP '\\\\' ORDER BY `name`;",
   );
   assertResult("REGEXP '\\\\' matches literal backslash", reEscBackRes, {
     columns: ["name"],
     rows: [["has\\backslash"]],
   });
+
 
   // NOT REGEXP — inverse of the anchored letter class above.
   const reNotRes = await run(
