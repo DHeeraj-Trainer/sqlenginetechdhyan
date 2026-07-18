@@ -1489,7 +1489,111 @@ async function main() {
     },
   );
 
+  // --- 9g. Positional ORDER BY with explicit COLLATE + NULLS FIRST/LAST ---
+  // Rebuild `names` with NULL rows so positional refs must carry both the
+  // collation and the NULLS placement.
+  const collateNullsSeed = await run(`
+    DROP TABLE IF EXISTS \`names\`;
+    CREATE TABLE \`names\` (
+      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+      \`name\` VARCHAR(64)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    INSERT INTO \`names\` (\`name\`) VALUES
+      ('apple'),
+      ('Banana'),
+      (NULL),
+      ('cherry'),
+      ('BLUEBERRY'),
+      (NULL),
+      ('avocado');
+  `);
+  if (collateNullsSeed.error) fail(`names+NULL seed failed: ${collateNullsSeed.error}`);
+  else ok("seed: names table with NULLs for positional COLLATE tests");
 
+  // Positional col 2 COLLATE utf8mb4_bin ASC NULLS LAST — uppercase codepoints
+  // first, then lowercase, NULLs pushed to the end. Tiebreak by id.
+  const posCollateBinNullsLast = await run(
+    "SELECT `id`, `name` FROM `names` ORDER BY 2 COLLATE utf8mb4_bin ASC NULLS LAST, 1 ASC;",
+  );
+  assertResult(
+    "ORDER BY 2 COLLATE utf8mb4_bin ASC NULLS LAST, 1 ASC (positional)",
+    posCollateBinNullsLast,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [5, "BLUEBERRY"],
+        [2, "Banana"],
+        [1, "apple"],
+        [7, "avocado"],
+        [4, "cherry"],
+        [3, null],
+        [6, null],
+      ],
+    },
+  );
+
+  // Positional col 2 COLLATE utf8mb4_unicode_ci ASC NULLS FIRST — case
+  // insensitive alphabetical order, NULLs pulled to the top.
+  const posCollateCiNullsFirst = await run(
+    "SELECT `id`, `name` FROM `names` ORDER BY 2 COLLATE utf8mb4_unicode_ci ASC NULLS FIRST, 1 ASC;",
+  );
+  assertResult(
+    "ORDER BY 2 COLLATE utf8mb4_unicode_ci ASC NULLS FIRST, 1 ASC (positional)",
+    posCollateCiNullsFirst,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [3, null],
+        [6, null],
+        [1, "apple"],
+        [7, "avocado"],
+        [2, "Banana"],
+        [5, "BLUEBERRY"],
+        [4, "cherry"],
+      ],
+    },
+  );
+
+  // Positional col 2 COLLATE utf8mb4_bin DESC NULLS FIRST — reverse binary
+  // (lowercase before uppercase), NULLs pulled to the front.
+  const posCollateBinDescNullsFirst = await run(
+    "SELECT `id`, `name` FROM `names` ORDER BY 2 COLLATE utf8mb4_bin DESC NULLS FIRST, 1 ASC;",
+  );
+  assertResult(
+    "ORDER BY 2 COLLATE utf8mb4_bin DESC NULLS FIRST, 1 ASC (positional)",
+    posCollateBinDescNullsFirst,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [3, null],
+        [6, null],
+        [4, "cherry"],
+        [7, "avocado"],
+        [1, "apple"],
+        [2, "Banana"],
+        [5, "BLUEBERRY"],
+      ],
+    },
+  );
+
+  // Positional COLLATE binary alias combined with NULLS LAST + LIMIT offset,
+  // count — the pagination window skips the two uppercase rows and returns
+  // the next three lowercase rows before NULLs.
+  const posCollateBinaryPaged = await run(
+    "SELECT `id`, `name` FROM `names` ORDER BY 2 COLLATE binary ASC NULLS LAST, 1 ASC LIMIT 2, 3;",
+  );
+  assertResult(
+    "ORDER BY 2 COLLATE binary ASC NULLS LAST, 1 ASC LIMIT 2,3 (positional + paging)",
+    posCollateBinaryPaged,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [1, "apple"],
+        [7, "avocado"],
+        [4, "cherry"],
+      ],
+    },
+  );
 
 
 
