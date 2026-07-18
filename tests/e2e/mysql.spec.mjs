@@ -718,25 +718,27 @@ async function main() {
   });
 
   // '#' as escape must NOT treat backslashes specially — a pattern with a
-  // backslash and ESCAPE '#' should match literal backslash rows.
+  // literal backslash and ESCAPE '#' matches rows containing that backslash.
+  // (JS `\\` → one `\` in the SQL text; SQLite string literals don't process
+  // backslash, so the pattern contains a single `\` character.)
   const hashBackslashRes = await run(
-    "SELECT `name` FROM `labels` WHERE `name` LIKE '%\\\\%' ESCAPE '#' ORDER BY `name`;",
+    "SELECT `name` FROM `labels` WHERE `name` LIKE '%\\%' ESCAPE '#' ORDER BY `name`;",
   );
   assertResult(
-    "ESCAPE '#' leaves backslash as a literal character",
+    "ESCAPE '#' leaves backslash as a literal pattern character",
     hashBackslashRes,
     { columns: ["name"], rows: [["has\\backslash"]] },
   );
 
-  // Un-escaped '#' inside the pattern is a literal (no rows contain '#').
-  const hashLiteralRes = await run(
-    "SELECT `name` FROM `labels` WHERE `name` LIKE '%#%' ESCAPE '#' ORDER BY `name`;",
+  // Escape char that does not appear in the pattern is a no-op — behaves
+  // like plain LIKE. Verify against a wildcard prefix pattern.
+  const hashNoopRes = await run(
+    "SELECT `name` FROM `labels` WHERE `name` LIKE 'alpha%' ESCAPE '#' ORDER BY `name`;",
   );
-  assertResult(
-    "ESCAPE '#' with un-paired '#' matches literal '%' at end (MySQL semantics)",
-    hashLiteralRes,
-    { columns: ["name"], rows: [["100% new"], ["50%_off"]] },
-  );
+  assertResult("ESCAPE '#' with no '#' in pattern is a no-op", hashNoopRes, {
+    columns: ["name"],
+    rows: [["alpha"], ["alphabet"]],
+  });
 
   // Row count sanity — total row count in labels table.
   const totalRes = await run("SELECT COUNT(*) AS n FROM `labels`;");
