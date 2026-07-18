@@ -143,6 +143,7 @@ function WorkbenchInner() {
         runAndRender: (sql: string) => Promise<unknown>;
         engineId: string;
         switchEngine: (id: EngineId) => Promise<void>;
+        loadSample: (sampleId: string) => Promise<void>;
         status: string;
       };
       __wbEnableTestBridge?: boolean;
@@ -150,8 +151,6 @@ function WorkbenchInner() {
     if (import.meta.env.DEV || w.__wbEnableTestBridge) {
       w.__wb = {
         runQuery: (sql: string) => runQuery(sql),
-        // Same code path as clicking Run: populates the results area /
-        // ErrorPanel so E2E tests can assert what the UI renders.
         runAndRender: async (sql: string) => {
           const res = await runQuery(sql);
           if (res.error) {
@@ -171,13 +170,14 @@ function WorkbenchInner() {
         },
         engineId,
         switchEngine: (id: EngineId) => switchEngine(id),
+        loadSample: (sampleId: string) => loadSample(sampleId),
         status,
       };
     }
     return () => {
       if (w.__wb) delete w.__wb;
     };
-  }, [runQuery, engineId, switchEngine, status]);
+  }, [runQuery, engineId, switchEngine, loadSample, status]);
 
 
   const runActive = useCallback(async () => {
