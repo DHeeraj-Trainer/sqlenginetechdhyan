@@ -173,12 +173,13 @@ function WorkbenchInner() {
         switchEngine: (id: EngineId) => switchEngine(id),
         loadSample: (sampleId: string) => loadSample(sampleId),
         status,
+        error,
       };
     }
     return () => {
       if (w.__wb) delete w.__wb;
     };
-  }, [runQuery, engineId, switchEngine, loadSample, status]);
+  }, [runQuery, engineId, switchEngine, loadSample, status, error]);
 
 
   const runActive = useCallback(async () => {
