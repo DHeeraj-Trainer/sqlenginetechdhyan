@@ -175,7 +175,10 @@ function transformCode(code: string): string {
   // SHOW TABLES / SHOW DATABASES / DESCRIBE
   s = s.replace(/\bSHOW\s+TABLES\b/gi, "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
   s = s.replace(/\bSHOW\s+DATABASES\b/gi, "SELECT 'main' AS Database");
-  s = s.replace(/\b(?:DESCRIBE|DESC)\s+([A-Za-z_][\w]*|"[^"]+")/gi, 'PRAGMA table_info($1)');
+  // Only rewrite DESCRIBE (full keyword) or DESC when it clearly precedes a table name
+  // at statement start. Never touch DESC used inside ORDER BY.
+  s = s.replace(/(^|;)\s*DESCRIBE\s+([A-Za-z_][\w]*|"[^"]+")/gi, '$1 PRAGMA table_info($2)');
+  s = s.replace(/(^|;)\s*DESC\s+([A-Za-z_][\w]*|"[^"]+")\s*(?=;|$)/gi, '$1 PRAGMA table_info($2)');
 
   // CREATE TABLE ... ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=... COMMENT='...';
   // Strip everything from the trailing `)` to the `;` if it looks like table options.
