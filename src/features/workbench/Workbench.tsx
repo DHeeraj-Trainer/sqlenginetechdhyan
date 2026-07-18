@@ -145,6 +145,7 @@ function WorkbenchInner() {
         switchEngine: (id: EngineId) => Promise<void>;
         loadSample: (sampleId: string) => Promise<void>;
         status: string;
+        error: string | null;
       };
       __wbEnableTestBridge?: boolean;
     };
