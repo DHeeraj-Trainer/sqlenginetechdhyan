@@ -794,7 +794,7 @@ async function main() {
   );
   assertResult("REGEXP 'a.b' — '.' is any-char wildcard", reDotWildRes, {
     columns: ["n"],
-    rows: [[2]], // 'a_b' and 'alphabet' both contain a<any>b
+    rows: [[1]], // only 'a_b' has one char between 'a' and 'b'
   });
   const reEscDotRes = await run(
     "SELECT COUNT(*) AS n FROM `labels` WHERE `name` REGEXP 'a\\.b';",
