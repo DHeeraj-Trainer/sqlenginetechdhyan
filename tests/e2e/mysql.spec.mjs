@@ -1824,6 +1824,254 @@ async function main() {
     },
   );
 
+  // --- 9j. Expression ORDER BY mixing ASC/DESC + NULLS FIRST/LAST ----------
+  // Uses `orders`: 1 alice 'first' | 2 bob NULL | 3 carol 'vip' | 4 dave NULL | 5 erin 'promo'.
+  // LENGTH('first')=5, LENGTH('vip')=3, LENGTH('promo')=5. LENGTH(NULL)=NULL.
+
+  const exprLenDescNullsFirst = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY LENGTH(`note`) DESC NULLS FIRST, `id` ASC;",
+  );
+  assertResult(
+    "ORDER BY LENGTH(note) DESC NULLS FIRST, id ASC (mixed direction + NULLS FIRST)",
+    exprLenDescNullsFirst,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [2, null],
+        [4, null],
+        [1, "first"],
+        [5, "promo"],
+        [3, "vip"],
+      ],
+    },
+  );
+
+  const exprLenAscNullsFirstIdDesc = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY LENGTH(`note`) ASC NULLS FIRST, `id` DESC;",
+  );
+  assertResult(
+    "ORDER BY LENGTH(note) ASC NULLS FIRST, id DESC (ASC key + DESC tiebreak)",
+    exprLenAscNullsFirstIdDesc,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [4, null],
+        [2, null],
+        [3, "vip"],
+        [5, "promo"],
+        [1, "first"],
+      ],
+    },
+  );
+
+  // --- 9k. CASE expression ORDER BY + NULLS FIRST/LAST ---------------------
+
+  const exprCaseAscNullsLast = await run(`
+    SELECT \`id\`, \`note\` FROM \`orders\`
+    ORDER BY
+      CASE
+        WHEN \`note\` IS NULL THEN NULL
+        WHEN \`note\` = 'vip' THEN 1
+        ELSE 2
+      END ASC NULLS LAST,
+      \`id\` ASC;
+  `);
+  assertResult(
+    "ORDER BY CASE ... ASC NULLS LAST, id ASC (CASE emits NULL)",
+    exprCaseAscNullsLast,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [3, "vip"],
+        [1, "first"],
+        [5, "promo"],
+        [2, null],
+        [4, null],
+      ],
+    },
+  );
+
+  const exprCaseValueDescNullsFirst = await run(`
+    SELECT \`id\`, \`note\` FROM \`orders\`
+    ORDER BY
+      CASE \`note\`
+        WHEN 'vip' THEN 1
+        WHEN 'first' THEN 2
+      END DESC NULLS FIRST,
+      \`id\` ASC;
+  `);
+  assertResult(
+    "ORDER BY CASE note WHEN ... END DESC NULLS FIRST, id ASC (simple-CASE, unmatched → NULL)",
+    exprCaseValueDescNullsFirst,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [2, null],
+        [4, null],
+        [5, null],
+        [1, "first"],
+        [3, "vip"],
+      ],
+    },
+  );
+
+  // --- 9l. Mixed positional + expression keys with NULLS -------------------
+
+  // First key: positional col 2 (note) ASC NULLS LAST.
+  // Distinct non-NULL notes decide the top rows; the two NULL rows are
+  // tiebroken by the second (expression) key LENGTH(customer) DESC:
+  // LENGTH('dave')=4 > LENGTH('bob')=3, so dave (id 4) comes before bob (id 2).
+  const mixedPosThenExpr = await run(
+    "SELECT `id`, `customer`, `note` FROM `orders` " +
+      "ORDER BY 2 ASC NULLS LAST, LENGTH(`customer`) DESC;",
+  );
+  assertResult(
+    "ORDER BY 2 ASC NULLS LAST, LENGTH(customer) DESC (positional + expression)",
+    mixedPosThenExpr,
+    {
+      columns: ["id", "customer", "note"],
+      rows: [
+        [1, "alice", "first"],
+        [5, "erin", "promo"],
+        [3, "carol", "vip"],
+        [4, "dave", null],
+        [2, "bob", null],
+      ],
+    },
+  );
+
+  // First key: expression LENGTH(customer) ASC.
+  // customer lengths: bob=3, dave=4, erin=4, alice=5, carol=5.
+  // Second key: positional col 3 (note) DESC NULLS LAST breaks the length ties.
+  const mixedExprThenPos = await run(
+    "SELECT `id`, `customer`, `note` FROM `orders` " +
+      "ORDER BY LENGTH(`customer`) ASC, 3 DESC NULLS LAST;",
+  );
+  assertResult(
+    "ORDER BY LENGTH(customer) ASC, 3 DESC NULLS LAST (expression + positional)",
+    mixedExprThenPos,
+    {
+      columns: ["id", "customer", "note"],
+      rows: [
+        [2, "bob", null],
+        [5, "erin", "promo"],
+        [4, "dave", null],
+        [3, "carol", "vip"],
+        [1, "alice", "first"],
+      ],
+    },
+  );
+
+  // --- 9m. Expression ORDER BY + NULLS across successive LIMIT/OFFSET ------
+  // Full ordering by `ORDER BY LENGTH(note) ASC NULLS LAST, id ASC`:
+  //   [3 'vip', 1 'first', 5 'promo', 2 NULL, 4 NULL]
+  // Walk it as three sequential 2-row pages and verify each page.
+  const paginationOrderBy =
+    "ORDER BY LENGTH(`note`) ASC NULLS LAST, `id` ASC";
+
+  const paginationPage1 = await run(
+    `SELECT \`id\`, \`note\` FROM \`orders\` ${paginationOrderBy} LIMIT 2 OFFSET 0;`,
+  );
+  assertResult(
+    "expression ORDER BY + NULLS LAST — page 1 (LIMIT 2 OFFSET 0)",
+    paginationPage1,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [3, "vip"],
+        [1, "first"],
+      ],
+    },
+  );
+
+  const paginationPage2 = await run(
+    `SELECT \`id\`, \`note\` FROM \`orders\` ${paginationOrderBy} LIMIT 2 OFFSET 2;`,
+  );
+  assertResult(
+    "expression ORDER BY + NULLS LAST — page 2 (LIMIT 2 OFFSET 2, straddles NULL boundary)",
+    paginationPage2,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [5, "promo"],
+        [2, null],
+      ],
+    },
+  );
+
+  const paginationPage3 = await run(
+    `SELECT \`id\`, \`note\` FROM \`orders\` ${paginationOrderBy} LIMIT 2 OFFSET 4;`,
+  );
+  assertResult(
+    "expression ORDER BY + NULLS LAST — page 3 (LIMIT 2 OFFSET 4, tail NULL)",
+    paginationPage3,
+    {
+      columns: ["id", "note"],
+      rows: [[4, null]],
+    },
+  );
+
+  const paginationPastEnd = await run(
+    `SELECT \`id\`, \`note\` FROM \`orders\` ${paginationOrderBy} LIMIT 2 OFFSET 6;`,
+  );
+  if (paginationPastEnd.error) {
+    fail(`expression ORDER BY pagination past end error: ${paginationPastEnd.error}`);
+  } else if ((paginationPastEnd.rows || []).length === 0) {
+    ok("expression ORDER BY + NULLS LAST — past-end page (LIMIT 2 OFFSET 6) is empty");
+  } else {
+    fail(`past-end page returned ${paginationPastEnd.rows.length} rows, expected 0`);
+  }
+
+  // --- 9n. Expression ORDER BY + explicit COLLATE + NULLS FIRST/LAST -------
+  // Uses the `names` table seeded in 9g:
+  //   1 apple | 2 Banana | 3 NULL | 4 cherry | 5 BLUEBERRY | 6 NULL | 7 avocado
+
+  // UPPER(name) COLLATE utf8mb4_bin ASC NULLS LAST — every value is
+  // upper-cased before binary compare, so ordering is purely alphabetical.
+  const exprCollateBinNullsLast = await run(
+    "SELECT `id`, `name` FROM `names` " +
+      "ORDER BY UPPER(`name`) COLLATE utf8mb4_bin ASC NULLS LAST, `id` ASC;",
+  );
+  assertResult(
+    "ORDER BY UPPER(name) COLLATE utf8mb4_bin ASC NULLS LAST, id ASC",
+    exprCollateBinNullsLast,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [1, "apple"],
+        [7, "avocado"],
+        [2, "Banana"],
+        [5, "BLUEBERRY"],
+        [4, "cherry"],
+        [3, null],
+        [6, null],
+      ],
+    },
+  );
+
+  // (name) COLLATE utf8mb4_unicode_ci DESC NULLS FIRST — parenthesised
+  // column is an expression; case-insensitive sort places 'cherry' first.
+  const exprCollateCiDescNullsFirst = await run(
+    "SELECT `id`, `name` FROM `names` " +
+      "ORDER BY (`name`) COLLATE utf8mb4_unicode_ci DESC NULLS FIRST, `id` ASC;",
+  );
+  assertResult(
+    "ORDER BY (name) COLLATE utf8mb4_unicode_ci DESC NULLS FIRST, id ASC",
+    exprCollateCiDescNullsFirst,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [3, null],
+        [6, null],
+        [4, "cherry"],
+        [5, "BLUEBERRY"],
+        [2, "Banana"],
+        [7, "avocado"],
+        [1, "apple"],
+      ],
+    },
+  );
+
 
 
   // may be empty until the user hits Run in the editor). Bridge queries
