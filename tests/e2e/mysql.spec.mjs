@@ -1141,7 +1141,122 @@ async function main() {
     ],
   });
 
-  // --- 10. Result tab wiring — sanity-check the tab bar exists in DOM -----
+  // --- 9b. NULLS FIRST / NULLS LAST ordering (MySQL semantics) ------------
+  //
+  // MySQL treats NULL as smaller than any non-NULL value:
+  //   ORDER BY x ASC  → NULLs come FIRST
+  //   ORDER BY x DESC → NULLs come LAST
+  //
+  // MySQL itself does not parse `NULLS FIRST` / `NULLS LAST`, but the
+  // emulator accepts them as a portable extension and rewrites them into
+  // an (expr IS NULL) sort prefix so the rendered order is deterministic
+  // and matches what a real MySQL server produces for the equivalent
+  // ASC/DESC-only query.
+  //
+  // Seed rows (from section 1):
+  //   id  customer  note
+  //    1  alice     'first'
+  //    2  bob       NULL
+  //    3  carol     'vip'
+  //    4  dave      NULL
+  //    5  erin      'promo'
+  const nullsAscDefault = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY `note` ASC, `id` ASC;",
+  );
+  assertResult("ORDER BY note ASC → NULLs first (MySQL default)", nullsAscDefault, {
+    columns: ["id", "note"],
+    rows: [
+      [2, null],
+      [4, null],
+      [1, "first"],
+      [5, "promo"],
+      [3, "vip"],
+    ],
+  });
+
+  const nullsDescDefault = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY `note` DESC, `id` ASC;",
+  );
+  assertResult("ORDER BY note DESC → NULLs last (MySQL default)", nullsDescDefault, {
+    columns: ["id", "note"],
+    rows: [
+      [3, "vip"],
+      [5, "promo"],
+      [1, "first"],
+      [2, null],
+      [4, null],
+    ],
+  });
+
+  // Explicit NULLS LAST on ASC overrides the default (which would put NULLs first).
+  const nullsAscLast = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY `note` ASC NULLS LAST, `id` ASC;",
+  );
+  assertResult("ORDER BY note ASC NULLS LAST forces NULLs to the end", nullsAscLast, {
+    columns: ["id", "note"],
+    rows: [
+      [1, "first"],
+      [5, "promo"],
+      [3, "vip"],
+      [2, null],
+      [4, null],
+    ],
+  });
+
+  // Explicit NULLS FIRST on DESC overrides the default (which would put NULLs last).
+  const nullsDescFirst = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY `note` DESC NULLS FIRST, `id` ASC;",
+  );
+  assertResult("ORDER BY note DESC NULLS FIRST forces NULLs to the top", nullsDescFirst, {
+    columns: ["id", "note"],
+    rows: [
+      [2, null],
+      [4, null],
+      [3, "vip"],
+      [5, "promo"],
+      [1, "first"],
+    ],
+  });
+
+  // Bare NULLS FIRST / NULLS LAST (no explicit ASC/DESC) — default direction
+  // is ASC, so NULLS LAST here reorders the ASC result to put NULLs at the end.
+  const nullsBareLast = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY `note` NULLS LAST, `id` ASC;",
+  );
+  assertResult("ORDER BY note NULLS LAST (implicit ASC) puts NULLs last", nullsBareLast, {
+    columns: ["id", "note"],
+    rows: [
+      [1, "first"],
+      [5, "promo"],
+      [3, "vip"],
+      [2, null],
+      [4, null],
+    ],
+  });
+
+  // Multi-column: primary key non-null, secondary key nullable with NULLS FIRST.
+  // Groups by customer ASC first, then within each group orders by note DESC
+  // with NULLs at the top of each group. Since customer is unique here, this
+  // effectively verifies the NULLS clause survives multi-column parsing.
+  const nullsMulti = await run(
+    "SELECT `id`, `customer`, `note` FROM `orders` ORDER BY `note` DESC NULLS FIRST, `customer` ASC;",
+  );
+  assertResult(
+    "Multi-column ORDER BY note DESC NULLS FIRST, customer ASC",
+    nullsMulti,
+    {
+      columns: ["id", "customer", "note"],
+      rows: [
+        [2, "bob", null],
+        [4, "dave", null],
+        [3, "carol", "vip"],
+        [5, "erin", "promo"],
+        [1, "alice", "first"],
+      ],
+    },
+  );
+
+
 
   // The ResultsHeader always renders once the workbench mounts (tabs list
   // may be empty until the user hits Run in the editor). Bridge queries
