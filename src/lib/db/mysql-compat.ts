@@ -141,15 +141,16 @@ export const compatFeatures: CompatFeature[] = [
     name: "CONCAT(a, b, ...)",
     description: "Variadic string concatenation.",
     category: "Functions",
-    status: { mysql: E, sqlite: E, postgres: S, alasql: S },
-    notes: "Emulator rewrites to `a || b || c` for SQLite.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: S, alasql: S },
+    notes: "Live MySQL runs CONCAT natively. Emulator rewrites `CONCAT(a,b,c)` to `(a || b || c)` for SQLite.",
   },
   {
     name: "NOW() / CURDATE() / CURTIME()",
     description: "Current date/time helpers.",
     category: "Functions",
-    status: { mysql: E, sqlite: E, postgres: E, alasql: E },
-    notes: "Mapped to SQLite `datetime('now')` / `date('now')` / `time('now')`.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: E, alasql: E },
+    notes:
+      "Live MySQL uses the native functions. Emulator maps to `CURRENT_TIMESTAMP` / `DATE('now')` / `TIME('now')` on SQLite.",
   },
   {
     name: "DATE_FORMAT / STR_TO_DATE",
