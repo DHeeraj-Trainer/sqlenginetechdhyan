@@ -2028,22 +2028,24 @@ async function main() {
   // Uses the `names` table seeded in 9g:
   //   1 apple | 2 Banana | 3 NULL | 4 cherry | 5 BLUEBERRY | 6 NULL | 7 avocado
 
-  // UPPER(name) COLLATE utf8mb4_bin ASC NULLS LAST — every value is
-  // upper-cased before binary compare, so ordering is purely alphabetical.
+  // `(name COLLATE utf8mb4_bin)` — the whole `expr COLLATE X` wrapped in
+  // parens is a first-class expression, so MySQL/SQLite honour the binary
+  // collation and the NULLS LAST placement together. Uppercase codepoints
+  // sort before lowercase; the two NULL rows land at the end.
   const exprCollateBinNullsLast = await run(
     "SELECT `id`, `name` FROM `names` " +
-      "ORDER BY UPPER(`name`) COLLATE utf8mb4_bin ASC NULLS LAST, `id` ASC;",
+      "ORDER BY (`name` COLLATE utf8mb4_bin) ASC NULLS LAST, `id` ASC;",
   );
   assertResult(
-    "ORDER BY UPPER(name) COLLATE utf8mb4_bin ASC NULLS LAST, id ASC",
+    "ORDER BY (name COLLATE utf8mb4_bin) ASC NULLS LAST, id ASC (wrapped-expr)",
     exprCollateBinNullsLast,
     {
       columns: ["id", "name"],
       rows: [
+        [5, "BLUEBERRY"],
+        [2, "Banana"],
         [1, "apple"],
         [7, "avocado"],
-        [2, "Banana"],
-        [5, "BLUEBERRY"],
         [4, "cherry"],
         [3, null],
         [6, null],
@@ -2051,14 +2053,14 @@ async function main() {
     },
   );
 
-  // (name) COLLATE utf8mb4_unicode_ci DESC NULLS FIRST — parenthesised
-  // column is an expression; case-insensitive sort places 'cherry' first.
+  // `(name COLLATE utf8mb4_unicode_ci) DESC NULLS FIRST` — case-insensitive
+  // reverse alphabetical, NULLs pulled to the top.
   const exprCollateCiDescNullsFirst = await run(
     "SELECT `id`, `name` FROM `names` " +
-      "ORDER BY (`name`) COLLATE utf8mb4_unicode_ci DESC NULLS FIRST, `id` ASC;",
+      "ORDER BY (`name` COLLATE utf8mb4_unicode_ci) DESC NULLS FIRST, `id` ASC;",
   );
   assertResult(
-    "ORDER BY (name) COLLATE utf8mb4_unicode_ci DESC NULLS FIRST, id ASC",
+    "ORDER BY (name COLLATE utf8mb4_unicode_ci) DESC NULLS FIRST, id ASC (wrapped-expr)",
     exprCollateCiDescNullsFirst,
     {
       columns: ["id", "name"],
@@ -2073,6 +2075,27 @@ async function main() {
       ],
     },
   );
+
+  // Wrapped-expression COLLATE combined with LIMIT offset,count. Uses the
+  // binary sort above and pages through the two lowercase rows straddling
+  // the switch from uppercase to lowercase codepoints.
+  const exprCollateBinPaged = await run(
+    "SELECT `id`, `name` FROM `names` " +
+      "ORDER BY (`name` COLLATE utf8mb4_bin) ASC NULLS LAST, `id` ASC LIMIT 2, 3;",
+  );
+  assertResult(
+    "ORDER BY (name COLLATE utf8mb4_bin) ASC NULLS LAST, id ASC LIMIT 2,3 (expr COLLATE + paging)",
+    exprCollateBinPaged,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [1, "apple"],
+        [7, "avocado"],
+        [4, "cherry"],
+      ],
+    },
+  );
+
 
 
 
