@@ -67,15 +67,26 @@ function splitTopLevel(sql: string): string[] {
  */
 export function translateMysql(input: string): string {
   const parts = tokenize(input);
-  let out = "";
-  for (const p of parts) {
-    if (p.kind === "code") {
-      out += transformCode(p.value);
-    } else {
-      out += p.value; // strings/comments preserved verbatim
-    }
+  const transformed: Token[] = parts.map((p) =>
+    p.kind === "code" ? { kind: "code", value: transformCode(p.value) } : p,
+  );
+  // MySQL LIKE uses backslash as the default escape character; SQLite has no
+  // default escape. Append `ESCAPE '\'` to any LIKE/NOT LIKE whose pattern
+  // literal contains a backslash and that doesn't already carry an ESCAPE
+  // clause, so \%, \_, and \\ behave as literals — matching MySQL semantics.
+  for (let i = 0; i < transformed.length; i++) {
+    const tok = transformed[i];
+    if (tok.kind !== "string") continue;
+    const prev = transformed[i - 1];
+    if (!prev || prev.kind !== "code") continue;
+    if (!/\b(?:NOT\s+)?LIKE\s*$/i.test(prev.value)) continue;
+    if (!/\\/.test(tok.value)) continue;
+    const next = transformed[i + 1];
+    if (next && next.kind === "code" && /^\s*ESCAPE\b/i.test(next.value)) continue;
+    transformed.splice(i + 1, 0, { kind: "code", value: " ESCAPE '\\'" });
+    i++;
   }
-  return out;
+  return transformed.map((t) => t.value).join("");
 }
 
 interface Token {
