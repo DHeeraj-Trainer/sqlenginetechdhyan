@@ -1031,7 +1031,118 @@ async function main() {
     }
   }
 
+  // --- 9b. Multi-column ORDER BY mixing ASC/DESC with deliberate ties -----
+  // Seed a small `sales` table where several rows tie on the leading sort
+  // key(s). This lets us verify that (a) the MySQL emulator preserves the
+  // ASC/DESC directive per column, (b) later columns act as tie-breakers,
+  // and (c) the results grid renders rows in exactly that order.
+  const salesSeed = await run(`
+    DROP TABLE IF EXISTS \`sales\`;
+    CREATE TABLE \`sales\` (
+      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+      \`region\` VARCHAR(16) NOT NULL,
+      \`priority\` INT NOT NULL,
+      \`amount\` DECIMAL(10,2) NOT NULL
+    ) ENGINE=InnoDB;
+    INSERT INTO \`sales\` (\`region\`, \`priority\`, \`amount\`) VALUES
+      ('north', 2, 100.00),  -- id 1
+      ('north', 1, 100.00),  -- id 2  (ties id=1 on region+amount)
+      ('north', 2,  50.00),  -- id 3  (ties id=1 on region+priority)
+      ('south', 1, 100.00),  -- id 4
+      ('south', 1,  75.00),  -- id 5  (ties id=4 on region+priority)
+      ('south', 2,  75.00),  -- id 6  (ties id=5 on amount)
+      ('east',  3,  50.00);  -- id 7  (ties id=3 on amount, alone in region)
+  `);
+  if (salesSeed.error) fail(`sales seed failed: ${salesSeed.error}`);
+  else ok("seed: sales table for multi-column ORDER BY tests");
+
+  // Query A — region ASC, amount DESC, id ASC as final deterministic tiebreak.
+  // Within each region, higher amounts come first; equal amounts fall back to id ASC.
+  const orderARes = await run(
+    "SELECT `id`, `region`, `amount` FROM `sales` ORDER BY `region` ASC, `amount` DESC, `id` ASC;",
+  );
+  assertResult("ORDER BY region ASC, amount DESC, id ASC (ties break by id)", orderARes, {
+    columns: ["id", "region", "amount"],
+    rows: [
+      [7, "east", 50],
+      [1, "north", 100],
+      [2, "north", 100],
+      [3, "north", 50],
+      [4, "south", 100],
+      [5, "south", 75],
+      [6, "south", 75],
+    ],
+  });
+
+  // Query B — priority DESC first, then region ASC, then amount ASC.
+  // Verifies that DESC on the leading column doesn't leak into subsequent
+  // columns' direction, and that ties across all three cascade to id ASC.
+  const orderBRes = await run(
+    "SELECT `id`, `priority`, `region`, `amount` FROM `sales` " +
+      "ORDER BY `priority` DESC, `region` ASC, `amount` ASC, `id` ASC;",
+  );
+  assertResult(
+    "ORDER BY priority DESC, region ASC, amount ASC (mixed directions cascade)",
+    orderBRes,
+    {
+      columns: ["id", "priority", "region", "amount"],
+      rows: [
+        [7, 3, "east", 50],
+        [3, 2, "north", 50],
+        [1, 2, "north", 100],
+        [6, 2, "south", 75],
+        [2, 1, "north", 100],
+        [5, 1, "south", 75],
+        [4, 1, "south", 100],
+      ],
+    },
+  );
+
+  // Query C — amount DESC, region ASC, priority ASC. Every row ties with at
+  // least one other on `amount`, so this is a stress test of the tiebreak
+  // chain across three columns in mixed directions.
+  const orderCRes = await run(
+    "SELECT `id`, `amount`, `region`, `priority` FROM `sales` " +
+      "ORDER BY `amount` DESC, `region` ASC, `priority` ASC, `id` ASC;",
+  );
+  assertResult(
+    "ORDER BY amount DESC, region ASC, priority ASC (three-way tiebreak)",
+    orderCRes,
+    {
+      columns: ["id", "amount", "region", "priority"],
+      rows: [
+        [2, 100, "north", 1],
+        [1, 100, "north", 2],
+        [4, 100, "south", 1],
+        [5, 75, "south", 1],
+        [6, 75, "south", 2],
+        [7, 50, "east", 3],
+        [3, 50, "north", 2],
+      ],
+    },
+  );
+
+  // Query D — same as A but with column-position ORDER BY (ORDER BY 2, 3 DESC).
+  // MySQL allows ordering by SELECT-list ordinal; verify the emulator
+  // preserves per-position ASC/DESC and matches Query A's row order.
+  const orderDRes = await run(
+    "SELECT `id`, `region`, `amount` FROM `sales` ORDER BY 2 ASC, 3 DESC, 1 ASC;",
+  );
+  assertResult("ORDER BY 2 ASC, 3 DESC, 1 ASC (positional refs, mixed direction)", orderDRes, {
+    columns: ["id", "region", "amount"],
+    rows: [
+      [7, "east", 50],
+      [1, "north", 100],
+      [2, "north", 100],
+      [3, "north", 50],
+      [4, "south", 100],
+      [5, "south", 75],
+      [6, "south", 75],
+    ],
+  });
+
   // --- 10. Result tab wiring — sanity-check the tab bar exists in DOM -----
+
   // The ResultsHeader always renders once the workbench mounts (tabs list
   // may be empty until the user hits Run in the editor). Bridge queries
   // above go straight through the same QueryResult path that populates the
