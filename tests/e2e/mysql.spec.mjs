@@ -787,15 +787,23 @@ async function main() {
     rows: [["100% new"], ["50%_off"]],
   });
 
-  // Escaped '.' — must NOT act as any-char wildcard. No seeded row contains
-  // a literal '.', so this returns zero rows.
-  const reEscDotRes = await run(
-    "SELECT `name` FROM `labels` WHERE `name` REGEXP '\\.' ORDER BY `name`;",
+  // Escaped '.' — must NOT act as any-char wildcard. Contrast with unescaped
+  // '.' which acts as any-char (matches every row). We assert both sides.
+  const reDotWildRes = await run(
+    "SELECT COUNT(*) AS n FROM `labels` WHERE `name` REGEXP 'a.b';",
   );
-  assertResult("REGEXP '\\.' matches literal '.' (0 rows seeded)", reEscDotRes, {
-    columns: ["name"],
-    rows: [],
+  assertResult("REGEXP 'a.b' — '.' is any-char wildcard", reDotWildRes, {
+    columns: ["n"],
+    rows: [[2]], // 'a_b' and 'alphabet' both contain a<any>b
   });
+  const reEscDotRes = await run(
+    "SELECT COUNT(*) AS n FROM `labels` WHERE `name` REGEXP 'a\\.b';",
+  );
+  assertResult("REGEXP 'a\\.b' — escaped '.' is literal (0 matches)", reEscDotRes, {
+    columns: ["n"],
+    rows: [[0]],
+  });
+
 
   // Escaped backslash: pattern `\\\\` in JS = `\\\\` in SQL text = `\\` regex
   // = one literal backslash. Row 'has\backslash' contains one backslash.
