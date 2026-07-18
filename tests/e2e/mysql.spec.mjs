@@ -1908,9 +1908,10 @@ async function main() {
       rows: [
         [2, null],
         [4, null],
-        [5, null],
+        [5, "promo"],
         [1, "first"],
         [3, "vip"],
+
       ],
     },
   );
