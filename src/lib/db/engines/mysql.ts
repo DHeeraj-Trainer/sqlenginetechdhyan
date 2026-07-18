@@ -207,6 +207,9 @@ function insideStringOrComment(sql: string, pos: number): boolean {
     }
   }
   return s;
+}
+
+
 
 interface Token {
   kind: "code" | "string" | "comment";
