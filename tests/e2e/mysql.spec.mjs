@@ -1918,16 +1918,16 @@ async function main() {
 
   // --- 9l. Mixed positional + expression keys with NULLS -------------------
 
-  // First key: positional col 2 (note) ASC NULLS LAST.
+  // First key: positional col 3 (note) ASC NULLS LAST.
   // Distinct non-NULL notes decide the top rows; the two NULL rows are
   // tiebroken by the second (expression) key LENGTH(customer) DESC:
   // LENGTH('dave')=4 > LENGTH('bob')=3, so dave (id 4) comes before bob (id 2).
   const mixedPosThenExpr = await run(
     "SELECT `id`, `customer`, `note` FROM `orders` " +
-      "ORDER BY 2 ASC NULLS LAST, LENGTH(`customer`) DESC;",
+      "ORDER BY 3 ASC NULLS LAST, LENGTH(`customer`) DESC;",
   );
   assertResult(
-    "ORDER BY 2 ASC NULLS LAST, LENGTH(customer) DESC (positional + expression)",
+    "ORDER BY 3 ASC NULLS LAST, LENGTH(customer) DESC (positional + expression)",
     mixedPosThenExpr,
     {
       columns: ["id", "customer", "note"],
@@ -1940,6 +1940,7 @@ async function main() {
       ],
     },
   );
+
 
   // First key: expression LENGTH(customer) ASC.
   // customer lengths: bob=3, dave=4, erin=4, alice=5, carol=5.
