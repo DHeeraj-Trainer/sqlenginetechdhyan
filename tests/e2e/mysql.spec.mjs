@@ -83,6 +83,14 @@ async function main() {
   await page.waitForFunction(() => !!window.__wb, null, { timeout: TIMEOUT });
   ok("workbench bridge mounted (window.__wb)");
 
+  // Wait for the default sqlite boot to finish so engineRef is populated
+  // before loadSample runs (loadSample is a no-op while engineRef is null).
+  await page.waitForFunction(
+    () => window.__wb && window.__wb.status === "ready",
+    null,
+    { timeout: 60_000, polling: 200 },
+  );
+
   // Switch to a lightweight sample first so the MySQL emulator doesn't try
   // to translate the heavy enterprise raw-SQL script during boot.
   await page.evaluate(async () => {
