@@ -20,6 +20,6 @@ for (const q of [
   "SELECT id, customer, note FROM orders ORDER BY 3 ASC NULLS LAST, 2 DESC;",
 ]) {
   const r = await p.evaluate((s) => window.__wb.runQuery(s), q);
-  console.log(q, '=>', JSON.stringify(r.rows || r.error));
+  console.log(q, '=>', JSON.stringify(r));
 }
 await b.close();
