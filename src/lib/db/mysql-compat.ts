@@ -95,22 +95,23 @@ export const compatFeatures: CompatFeature[] = [
     name: "DATETIME / TIMESTAMP",
     description: "MySQL date-time types.",
     category: "Types",
-    status: { mysql: E, sqlite: E, postgres: S, alasql: E },
-    notes: "Stored as TEXT under the SQLite-backed emulator; comparisons still work lexicographically for ISO strings.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: S, alasql: E },
+    notes:
+      "Live MySQL uses the native types. Emulator stores as TEXT (ISO 8601); comparisons and DATE()/TIME() helpers still work.",
   },
   {
     name: "VARCHAR(n) / TEXT family",
     description: "Length-bound and blob text types.",
     category: "Types",
-    status: { mysql: E, sqlite: S, postgres: S, alasql: S },
-    notes: "Length constraint is dropped by the emulator.",
+    status: { mysql: E, "mysql-live": S, sqlite: S, postgres: S, alasql: S },
+    notes: "Length constraint is dropped by the emulator; enforced on live MySQL.",
   },
   {
     name: "DECIMAL(p, s)",
     description: "Fixed-precision numeric.",
     category: "Types",
-    status: { mysql: E, sqlite: E, postgres: S, alasql: E },
-    notes: "Rewritten to REAL/DOUBLE; scale is not enforced.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: S, alasql: E },
+    notes: "Live MySQL enforces precision/scale. Emulator maps to REAL; scale is not enforced.",
   },
   {
     name: "ENUM / SET",
@@ -140,15 +141,16 @@ export const compatFeatures: CompatFeature[] = [
     name: "CONCAT(a, b, ...)",
     description: "Variadic string concatenation.",
     category: "Functions",
-    status: { mysql: E, sqlite: E, postgres: S, alasql: S },
-    notes: "Emulator rewrites to `a || b || c` for SQLite.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: S, alasql: S },
+    notes: "Live MySQL runs CONCAT natively. Emulator rewrites `CONCAT(a,b,c)` to `(a || b || c)` for SQLite.",
   },
   {
     name: "NOW() / CURDATE() / CURTIME()",
     description: "Current date/time helpers.",
     category: "Functions",
-    status: { mysql: E, sqlite: E, postgres: E, alasql: E },
-    notes: "Mapped to SQLite `datetime('now')` / `date('now')` / `time('now')`.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: E, alasql: E },
+    notes:
+      "Live MySQL uses the native functions. Emulator maps to `CURRENT_TIMESTAMP` / `DATE('now')` / `TIME('now')` on SQLite.",
   },
   {
     name: "DATE_FORMAT / STR_TO_DATE",
@@ -185,8 +187,9 @@ export const compatFeatures: CompatFeature[] = [
     description: "Auto-generated integer primary keys.",
     category: "DDL",
     example: "id INT AUTO_INCREMENT PRIMARY KEY",
-    status: { mysql: E, sqlite: E, postgres: E, alasql: E },
-    notes: "Rewritten to `INTEGER PRIMARY KEY AUTOINCREMENT` for SQLite; SERIAL for Postgres.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: E, alasql: E },
+    notes:
+      "Live MySQL runs `AUTO_INCREMENT` natively. Emulator rewrites to `INTEGER PRIMARY KEY AUTOINCREMENT` for SQLite and normalises `INT AUTO_INCREMENT PRIMARY KEY` ordering.",
   },
   {
     name: "ENGINE=/CHARSET=/COLLATE= options",
@@ -223,15 +226,17 @@ export const compatFeatures: CompatFeature[] = [
     description: "MySQL upsert form.",
     category: "DML",
     example: "INSERT INTO t (id, v) VALUES (1, 'a') ON DUPLICATE KEY UPDATE v = VALUES(v);",
-    status: { mysql: U, sqlite: U, postgres: U, alasql: U },
-    notes: "Rewrite to `INSERT … ON CONFLICT (id) DO UPDATE SET …` for portability.",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: U, alasql: U },
+    notes:
+      "Live MySQL runs it natively. Emulator rewrites to `ON CONFLICT DO UPDATE SET col = excluded.col …` for SQLite.",
   },
   {
     name: "INSERT IGNORE",
     description: "Skip rows on unique-key conflict.",
     category: "DML",
-    status: { mysql: U, sqlite: E, postgres: U, alasql: U },
-    notes: "Use `INSERT OR IGNORE` (SQLite) or `ON CONFLICT DO NOTHING` (Postgres).",
+    status: { mysql: E, "mysql-live": S, sqlite: E, postgres: U, alasql: U },
+    notes:
+      "Live MySQL runs `INSERT IGNORE` natively. Emulator rewrites to `INSERT OR IGNORE` for SQLite.",
   },
   {
     name: "REPLACE INTO",
