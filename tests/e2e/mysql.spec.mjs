@@ -1257,8 +1257,156 @@ async function main() {
   );
 
 
+  // --- 9c. ORDER BY expressions ------------------------------------------
+  // MySQL allows arbitrary scalar expressions in ORDER BY. Verify a handful
+  // of common shapes against the emulator: arithmetic, function calls, and
+  // CASE expressions. Uses the `orders` seed from section 1.
+  const orderExprArith = await run(
+    "SELECT `id`, `customer` FROM `orders` ORDER BY (`id` + 1) DESC;",
+  );
+  assertResult("ORDER BY (id + 1) DESC matches id DESC", orderExprArith, {
+    columns: ["id", "customer"],
+    rows: [
+      [5, "erin"],
+      [4, "dave"],
+      [3, "carol"],
+      [2, "bob"],
+      [1, "alice"],
+    ],
+  });
 
-  // The ResultsHeader always renders once the workbench mounts (tabs list
+  const orderExprLower = await run(
+    "SELECT `id`, `customer` FROM `orders` ORDER BY LOWER(`customer`) ASC;",
+  );
+  assertResult("ORDER BY LOWER(customer) ASC sorts alphabetically", orderExprLower, {
+    columns: ["id", "customer"],
+    rows: [
+      [1, "alice"],
+      [2, "bob"],
+      [3, "carol"],
+      [4, "dave"],
+      [5, "erin"],
+    ],
+  });
+
+  // CASE expression: non-null notes first (0), NULL notes after (1), stable by id.
+  const orderExprCase = await run(
+    "SELECT `id`, `note` FROM `orders` " +
+      "ORDER BY CASE WHEN `note` IS NULL THEN 1 ELSE 0 END ASC, `id` ASC;",
+  );
+  assertResult(
+    "ORDER BY CASE WHEN note IS NULL THEN 1 ELSE 0 END puts non-nulls first",
+    orderExprCase,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [1, "first"],
+        [3, "vip"],
+        [5, "promo"],
+        [2, null],
+        [4, null],
+      ],
+    },
+  );
+
+  // --- 9d. NULLS FIRST/LAST combined with LIMIT / OFFSET ------------------
+  const nullsLimitAscLast = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY `note` ASC NULLS LAST, `id` ASC LIMIT 2;",
+  );
+  assertResult("NULLS LAST + LIMIT 2 returns first two non-null notes", nullsLimitAscLast, {
+    columns: ["id", "note"],
+    rows: [
+      [1, "first"],
+      [5, "promo"],
+    ],
+  });
+
+  const nullsLimitDescFirstOffset = await run(
+    "SELECT `id`, `note` FROM `orders` " +
+      "ORDER BY `note` DESC NULLS FIRST, `id` ASC LIMIT 2 OFFSET 1;",
+  );
+  assertResult(
+    "NULLS FIRST + LIMIT 2 OFFSET 1 skips first NULL then returns [null, 'vip']",
+    nullsLimitDescFirstOffset,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [4, null],
+        [3, "vip"],
+      ],
+    },
+  );
+
+  // MySQL offset-first form: LIMIT 2, 2  with NULLS LAST — skips the two
+  // non-null leaders and returns the third non-null + first NULL.
+  const nullsLimitOffsetForm = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY `note` ASC NULLS LAST, `id` ASC LIMIT 2, 2;",
+  );
+  assertResult("NULLS LAST + LIMIT 2, 2 returns ['vip', null]", nullsLimitOffsetForm, {
+    columns: ["id", "note"],
+    rows: [
+      [3, "vip"],
+      [2, null],
+    ],
+  });
+
+  // --- 9e. ORDER BY with explicit COLLATE --------------------------------
+  // Rebuild a small case-mixed table so we can compare _bin (case-sensitive
+  // ASCII order: uppercase before lowercase) against _unicode_ci (case-
+  // insensitive alphabetical order).
+  const collateSeed = await run(`
+    DROP TABLE IF EXISTS \`names\`;
+    CREATE TABLE \`names\` (
+      \`id\` INT AUTO_INCREMENT PRIMARY KEY,
+      \`name\` VARCHAR(64) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    INSERT INTO \`names\` (\`name\`) VALUES
+      ('apple'),
+      ('Banana'),
+      ('cherry'),
+      ('BLUEBERRY'),
+      ('avocado');
+  `);
+  if (collateSeed.error) fail(`names seed failed: ${collateSeed.error}`);
+  else ok("seed: names table for COLLATE tests");
+
+  // utf8mb4_bin → BINARY. ASCII: uppercase codepoints < lowercase, so the
+  // two capitalised rows sort before the lowercase ones.
+  const collateBin = await run(
+    "SELECT `name` FROM `names` ORDER BY `name` COLLATE utf8mb4_bin ASC;",
+  );
+  assertResult("ORDER BY name COLLATE utf8mb4_bin (binary, uppercase first)", collateBin, {
+    columns: ["name"],
+    rows: [["BLUEBERRY"], ["Banana"], ["apple"], ["avocado"], ["cherry"]],
+  });
+
+  // utf8mb4_unicode_ci → NOCASE. Case-insensitive alphabetical order.
+  const collateCi = await run(
+    "SELECT `name` FROM `names` ORDER BY `name` COLLATE utf8mb4_unicode_ci ASC;",
+  );
+  assertResult(
+    "ORDER BY name COLLATE utf8mb4_unicode_ci (case-insensitive)",
+    collateCi,
+    {
+      columns: ["name"],
+      rows: [["apple"], ["avocado"], ["Banana"], ["BLUEBERRY"], ["cherry"]],
+    },
+  );
+
+  // COLLATE binary alias — MySQL accepts a bare `BINARY` collation name too.
+  const collateBinaryAlias = await run(
+    "SELECT `name` FROM `names` ORDER BY `name` COLLATE binary ASC;",
+  );
+  assertResult(
+    "ORDER BY name COLLATE binary matches _bin ordering",
+    collateBinaryAlias,
+    {
+      columns: ["name"],
+      rows: [["BLUEBERRY"], ["Banana"], ["apple"], ["avocado"], ["cherry"]],
+    },
+  );
+
+
   // may be empty until the user hits Run in the editor). Bridge queries
   // above go straight through the same QueryResult path that populates the
   // tabs, so column/row assertions match exactly what the UI would show.
