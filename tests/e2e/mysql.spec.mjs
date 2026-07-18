@@ -1596,6 +1596,127 @@ async function main() {
   );
 
 
+  // --- 9h. Positional ORDER BY + NULLS FIRST/LAST + LIMIT / OFFSET --------
+  // Using `orders`:
+  //   1 alice 'first' | 2 bob NULL | 3 carol 'vip' | 4 dave NULL | 5 erin 'promo'
+  // Every query below sorts by position (col 2 = note), controls NULL
+  // placement, then paginates. We verify the exact rows the UI would render.
+
+  // Positional ASC NULLS LAST + LIMIT (no offset) — non-null notes first.
+  const posNullsLastLimit = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 ASC NULLS LAST, 1 ASC LIMIT 3;",
+  );
+  assertResult(
+    "ORDER BY 2 ASC NULLS LAST, 1 ASC LIMIT 3 (positional)",
+    posNullsLastLimit,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [1, "first"],
+        [5, "promo"],
+        [3, "vip"],
+      ],
+    },
+  );
+
+  // Positional ASC NULLS LAST + LIMIT offset,count — window straddles the
+  // non-null/NULL boundary, so we see the last non-null row then a NULL row.
+  const posNullsLastPaged = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 ASC NULLS LAST, 1 ASC LIMIT 2, 2;",
+  );
+  assertResult(
+    "ORDER BY 2 ASC NULLS LAST, 1 ASC LIMIT 2,2 (positional straddles NULL boundary)",
+    posNullsLastPaged,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [3, "vip"],
+        [2, null],
+      ],
+    },
+  );
+
+  // Positional ASC NULLS FIRST + LIMIT with OFFSET keyword — skip past both
+  // NULL rows and return only the first non-null note.
+  const posNullsFirstOffsetPast = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 ASC NULLS FIRST, 1 ASC LIMIT 1 OFFSET 2;",
+  );
+  assertResult(
+    "ORDER BY 2 ASC NULLS FIRST, 1 ASC LIMIT 1 OFFSET 2 (positional skips both NULLs)",
+    posNullsFirstOffsetPast,
+    {
+      columns: ["id", "note"],
+      rows: [[1, "first"]],
+    },
+  );
+
+  // Positional DESC NULLS FIRST + LIMIT offset,count — NULLs first (2 rows),
+  // then the highest-sorted non-null note ('vip'). Window = offset 1, take 2.
+  const posDescNullsFirstPaged = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 DESC NULLS FIRST, 1 ASC LIMIT 1, 2;",
+  );
+  assertResult(
+    "ORDER BY 2 DESC NULLS FIRST, 1 ASC LIMIT 1,2 (positional across NULL boundary)",
+    posDescNullsFirstPaged,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [4, null],
+        [3, "vip"],
+      ],
+    },
+  );
+
+  // Positional DESC NULLS LAST + LIMIT with large OFFSET beyond non-null rows —
+  // returns only the trailing NULL rows.
+  const posDescNullsLastTail = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 DESC NULLS LAST, 1 ASC LIMIT 3, 5;",
+  );
+  assertResult(
+    "ORDER BY 2 DESC NULLS LAST, 1 ASC LIMIT 3,5 (positional returns tail NULLs)",
+    posDescNullsLastTail,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [2, null],
+        [4, null],
+      ],
+    },
+  );
+
+  // Positional NULLS placement + OFFSET beyond total row count — empty set.
+  const posOffsetOverflow = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 ASC NULLS LAST, 1 ASC LIMIT 10 OFFSET 99;",
+  );
+  assertResult(
+    "ORDER BY 2 ASC NULLS LAST LIMIT 10 OFFSET 99 (positional, offset past end)",
+    posOffsetOverflow,
+    { columns: ["id", "note"], rows: [] },
+  );
+
+  // Two positional keys with NULLS on each + LIMIT — col 2 (note) NULLS
+  // FIRST, tiebreak col 1 (id) DESC. First three rows: both NULLs (id 4,2)
+  // then the largest-note-first tiebreak → 'vip' (id 3).
+  const posMultiKeyPaged = await run(
+    "SELECT `id`, `note` FROM `orders` ORDER BY 2 ASC NULLS FIRST, 1 DESC LIMIT 3;",
+  );
+  assertResult(
+    "ORDER BY 2 ASC NULLS FIRST, 1 DESC LIMIT 3 (positional multi-key)",
+    posMultiKeyPaged,
+    {
+      columns: ["id", "note"],
+      rows: [
+        [4, null],
+        [2, null],
+        [1, "first"],
+      ],
+    },
+  );
+
+
+
+
+
 
   // may be empty until the user hits Run in the editor). Bridge queries
   // above go straight through the same QueryResult path that populates the
