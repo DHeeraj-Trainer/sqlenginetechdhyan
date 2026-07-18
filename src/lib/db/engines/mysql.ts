@@ -302,6 +302,21 @@ function transformCode(code: string): string {
   // LIMIT offset, count → LIMIT count OFFSET offset
   s = s.replace(/\bLIMIT\s+(\d+)\s*,\s*(\d+)/gi, "LIMIT $2 OFFSET $1");
 
+  // INSERT IGNORE INTO → INSERT OR IGNORE INTO (SQLite equivalent).
+  s = s.replace(/\bINSERT\s+IGNORE\s+INTO\b/gi, "INSERT OR IGNORE INTO");
+  // INSERT ... ON DUPLICATE KEY UPDATE col = VALUES(col), ...  →
+  //   INSERT ... ON CONFLICT DO UPDATE SET col = excluded.col, ...
+  s = s.replace(
+    /\bON\s+DUPLICATE\s+KEY\s+UPDATE\b([\s\S]*?)(?=;|$)/gi,
+    (_m, assigns: string) => {
+      const rewritten = assigns.replace(
+        /\bVALUES\s*\(\s*([A-Za-z_][\w]*|"[^"]+")\s*\)/gi,
+        (_v, col: string) => `excluded.${col}`,
+      );
+      return `ON CONFLICT DO UPDATE SET${rewritten}`;
+    },
+  );
+
   // Collapse extra whitespace introduced by strips
   s = s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
 
