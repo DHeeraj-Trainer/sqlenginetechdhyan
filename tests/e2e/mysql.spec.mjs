@@ -687,7 +687,7 @@ async function main() {
   assertResult(
     "LIKE '%\\_%' matches literal '_' (MySQL default backslash escape)",
     backslashUnderRes,
-    { columns: ["name"], rows: [["50%_off"], ["has\\backslash"]] },
+    { columns: ["name"], rows: [["50%_off"], ["a_b"], ["under_score"]] },
   );
 
   // Row count sanity — total row count in labels table.
