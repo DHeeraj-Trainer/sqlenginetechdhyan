@@ -19,6 +19,13 @@ export interface SampleDatabase {
   name: string;
   description: string;
   tables: SampleTable[];
+  /**
+   * Optional per-engine raw SQL. When set for the target engine (or via
+   * `default`), `buildScript` returns it verbatim instead of synthesising
+   * DDL/DML from `tables`. Used by enterprise sample DBs that need FKs,
+   * indexes, views, and richer constraints.
+   */
+  raw?: Partial<Record<EngineId, string>> & { default?: string };
 }
 
 function q(v: string | number | null): string {
@@ -39,10 +46,13 @@ function typeFor(t: ColumnSpec["type"], engine: EngineId): string {
 }
 
 export function buildScript(db: SampleDatabase, engine: EngineId): string {
+  if (db.raw) {
+    const raw = db.raw[engine] ?? db.raw.default;
+    if (raw) return raw;
+  }
   const parts: string[] = [];
-  const drop = engine === "postgres" ? "DROP TABLE IF EXISTS" : "DROP TABLE IF EXISTS";
   for (const t of [...db.tables].reverse()) {
-    parts.push(`${drop} ${t.name};`);
+    parts.push(`DROP TABLE IF EXISTS ${t.name};`);
   }
   for (const t of db.tables) {
     const cols = t.columns
