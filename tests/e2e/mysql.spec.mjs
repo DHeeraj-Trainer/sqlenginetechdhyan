@@ -83,6 +83,20 @@ async function main() {
   await page.waitForFunction(() => !!window.__wb, null, { timeout: TIMEOUT });
   ok("workbench bridge mounted (window.__wb)");
 
+  // Wait for the initial engine to mount (status ready OR error is fine —
+  // the enterprise raw-SQL seed can fail on the first boot, but engineRef
+  // is still set and loadSample will replace the sample cleanly).
+  await page.waitForFunction(
+    () => window.__wb && (window.__wb.status === "ready" || window.__wb.status === "error"),
+    null,
+    { timeout: 60_000, polling: 200 },
+  );
+
+  // Switch to a lightweight sample first so the MySQL emulator doesn't try
+  // to translate the heavy enterprise raw-SQL script during boot.
+  await page.evaluate(async () => {
+    await window.__wb.loadSample("chinook_lite");
+  });
   // Switch to MySQL emulator and wait until the engine is ready.
   await page.evaluate(() => window.__wb.switchEngine("mysql"));
   try {
@@ -2095,6 +2109,103 @@ async function main() {
       ],
     },
   );
+
+  // --- 9o. More expression ORDER BY + COLLATE + NULLS FIRST/LAST -----------
+  // Same `names` seed as 9g / 9n:
+  //   1 apple | 2 Banana | 3 NULL | 4 cherry | 5 BLUEBERRY | 6 NULL | 7 avocado
+
+  // Reverse binary collation with NULLS LAST — lowercase codepoints sort above
+  // uppercase; NULLs anchor the tail. Verifies wrapped-expr composes with DESC.
+  const exprBinDescNullsLast = await run(
+    "SELECT `id`, `name` FROM `names` " +
+      "ORDER BY (`name` COLLATE utf8mb4_bin) DESC NULLS LAST, `id` ASC;",
+  );
+  assertResult(
+    "ORDER BY (name COLLATE utf8mb4_bin) DESC NULLS LAST, id ASC (wrapped-expr)",
+    exprBinDescNullsLast,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [4, "cherry"],
+        [7, "avocado"],
+        [1, "apple"],
+        [2, "Banana"],
+        [5, "BLUEBERRY"],
+        [3, null],
+        [6, null],
+      ],
+    },
+  );
+
+  // Case-insensitive ASC with NULLS LAST + secondary `id DESC` — proves the
+  // collate/nulls clause on the primary expression does not leak direction
+  // into later keys.
+  const exprCiAscNullsLastIdDesc = await run(
+    "SELECT `id`, `name` FROM `names` " +
+      "ORDER BY (`name` COLLATE utf8mb4_unicode_ci) ASC NULLS LAST, `id` DESC;",
+  );
+  assertResult(
+    "ORDER BY (name COLLATE utf8mb4_unicode_ci) ASC NULLS LAST, id DESC (wrapped-expr)",
+    exprCiAscNullsLastIdDesc,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [1, "apple"],
+        [7, "avocado"],
+        [2, "Banana"],
+        [5, "BLUEBERRY"],
+        [4, "cherry"],
+        [6, null],
+        [3, null],
+      ],
+    },
+  );
+
+  // Multi-key: expression COLLATE primary + LENGTH() secondary + positional
+  // tertiary. Confirms NULLS FIRST on the primary key does not disturb order
+  // among non-null rows or the later expression key.
+  const exprBinMultiKey = await run(
+    "SELECT `id`, `name` FROM `names` " +
+      "ORDER BY (`name` COLLATE utf8mb4_bin) ASC NULLS FIRST, LENGTH(`name`) DESC, 1 ASC;",
+  );
+  assertResult(
+    "ORDER BY (name COLLATE utf8mb4_bin) ASC NULLS FIRST, LENGTH(name) DESC, 1 ASC",
+    exprBinMultiKey,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [3, null],
+        [6, null],
+        [5, "BLUEBERRY"],
+        [2, "Banana"],
+        [1, "apple"],
+        [7, "avocado"],
+        [4, "cherry"],
+      ],
+    },
+  );
+
+  // Wrapped-expression CI + DESC NULLS FIRST combined with LIMIT offset,count.
+  // Full order: NULL(3), NULL(6), cherry, BLUEBERRY, Banana, avocado, apple —
+  // skip 1 take 3 straddles the NULL/non-NULL boundary.
+  const exprCiPaged = await run(
+    "SELECT `id`, `name` FROM `names` " +
+      "ORDER BY (`name` COLLATE utf8mb4_unicode_ci) DESC NULLS FIRST, `id` ASC LIMIT 1, 3;",
+  );
+  assertResult(
+    "ORDER BY (name COLLATE utf8mb4_unicode_ci) DESC NULLS FIRST, id ASC LIMIT 1,3 (expr COLLATE + paging)",
+    exprCiPaged,
+    {
+      columns: ["id", "name"],
+      rows: [
+        [6, null],
+        [4, "cherry"],
+        [5, "BLUEBERRY"],
+      ],
+    },
+  );
+
+
 
 
 
